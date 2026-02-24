@@ -1,0 +1,158 @@
+openapi: 3.0.3
+info:
+  title: FI Service API
+  version: 2.0.0
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /v1/health:
+    get:
+      summary: Health probe
+      parameters:
+        - in: query
+          name: probe
+          schema:
+            type: string
+            enum: [liveness, readiness]
+      responses:
+        '200':
+          description: Healthy
+        '503':
+          description: Unhealthy
+  /v1/fi/request-kyc:
+    post:
+      summary: Create FI KYC request by delegating to consent-manager
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, fiId, purpose, requestedFields]
+              properties:
+                userId:
+                  type: string
+                fiId:
+                  type: string
+                purpose:
+                  type: string
+                requestedFields:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Consent request created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  consentId:
+                    type: string
+                    format: uuid
+                  tokenId:
+                    type: string
+                  status:
+                    type: string
+                  fiId:
+                    type: string
+                  purpose:
+                    type: string
+                  requestedFields:
+                    type: array
+                    items:
+                      type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  renewedFromConsentId:
+                    type: string
+                    nullable: true
+        '403':
+          description: Missing kyc.request scope
+  /v1/fi/renew-consent:
+    post:
+      summary: Renew existing consent for same FI purpose/scope without reissuing token
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [consentId]
+              properties:
+                consentId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Consent renewed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  previousConsentId:
+                    type: string
+                    format: uuid
+                  newConsentId:
+                    type: string
+                    format: uuid
+                  tokenId:
+                    type: string
+                  status:
+                    type: string
+                  fiId:
+                    type: string
+                  purpose:
+                    type: string
+                  requestedFields:
+                    type: array
+                    items:
+                      type: string
+                  nonce:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '403':
+          description: Missing kyc.request scope
+        '404':
+          description: consent_not_found
+  /v1/fi/verify-assertion:
+    post:
+      summary: Verify consent assertion JWT with audience/purpose/scope/replay/token status checks
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [consentId, assertionJwt]
+              properties:
+                consentId:
+                  type: string
+                  format: uuid
+                assertionJwt:
+                  type: string
+      responses:
+        '200':
+          description: Assertion verified and disclosed claims returned
+        '403':
+          description: Missing kyc.verify scope or policy checks failed
+        '409':
+          description: consent_binding_mismatch, consent_rejected, consent_not_approved, or consent_expired
+        '502':
+          description: consent_binding_lookup_failed

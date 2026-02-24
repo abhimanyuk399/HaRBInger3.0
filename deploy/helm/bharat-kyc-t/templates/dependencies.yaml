@@ -1,0 +1,214 @@
+{{- if .Values.global.dependencies.postgres.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.global.dependencies.postgres.serviceName }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.global.dependencies.postgres.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.global.dependencies.postgres.serviceName }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.global.dependencies.postgres.serviceName }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.global.dependencies.postgres.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: postgres
+              containerPort: {{ .Values.global.database.port }}
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.global.database.name | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.global.database.user | quote }}
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.global.database.password | quote }}
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+{{ toYaml .Values.global.dependencies.postgres.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.global.dependencies.postgres.serviceName }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.global.dependencies.postgres.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ports:
+    - name: postgres
+      port: {{ .Values.global.database.port }}
+      targetPort: {{ .Values.global.database.port }}
+  selector:
+    app.kubernetes.io/name: {{ .Values.global.dependencies.postgres.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+{{- end }}
+
+{{- if .Values.global.dependencies.redis.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.global.dependencies.redis.serviceName }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.global.dependencies.redis.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.global.dependencies.redis.serviceName }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.global.dependencies.redis.serviceName }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: redis
+          image: {{ .Values.global.dependencies.redis.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: redis
+              containerPort: {{ .Values.global.redis.port }}
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+{{ toYaml .Values.global.dependencies.redis.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.global.dependencies.redis.serviceName }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.global.dependencies.redis.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ports:
+    - name: redis
+      port: {{ .Values.global.redis.port }}
+      targetPort: {{ .Values.global.redis.port }}
+  selector:
+    app.kubernetes.io/name: {{ .Values.global.dependencies.redis.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+{{- end }}
+
+{{- if .Values.global.dependencies.keycloak.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.global.dependencies.keycloak.serviceName }}-realm
+  labels:
+    app.kubernetes.io/name: {{ .Values.global.dependencies.keycloak.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  dev-realm.json: |
+{{ .Files.Get "files/keycloak/dev-realm.json" | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.global.dependencies.keycloak.serviceName }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.global.dependencies.keycloak.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.global.dependencies.keycloak.serviceName }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.global.dependencies.keycloak.serviceName }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: keycloak
+          image: {{ .Values.global.dependencies.keycloak.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command:
+{{- range .Values.global.dependencies.keycloak.command }}
+            - {{ . | quote }}
+{{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.global.dependencies.keycloak.port }}
+          env:
+            - name: KEYCLOAK_ADMIN
+              value: {{ .Values.global.dependencies.keycloak.adminUser | quote }}
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              value: {{ .Values.global.dependencies.keycloak.adminPassword | quote }}
+          volumeMounts:
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import/dev-realm.json
+              subPath: dev-realm.json
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /realms/{{ .Values.global.dependencies.keycloak.realm }}/.well-known/openid-configuration
+              port: {{ .Values.global.dependencies.keycloak.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /realms/{{ .Values.global.dependencies.keycloak.realm }}/.well-known/openid-configuration
+              port: {{ .Values.global.dependencies.keycloak.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+{{ toYaml .Values.global.dependencies.keycloak.resources | nindent 12 }}
+      volumes:
+        - name: realm-import
+          configMap:
+            name: {{ .Values.global.dependencies.keycloak.serviceName }}-realm
+            items:
+              - key: dev-realm.json
+                path: dev-realm.json
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.global.dependencies.keycloak.serviceName }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.global.dependencies.keycloak.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ports:
+    - name: http
+      port: {{ .Values.global.dependencies.keycloak.port }}
+      targetPort: {{ .Values.global.dependencies.keycloak.port }}
+  selector:
+    app.kubernetes.io/name: {{ .Values.global.dependencies.keycloak.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+{{- end }}

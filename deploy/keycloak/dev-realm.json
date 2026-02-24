@@ -1,0 +1,304 @@
+{
+  "realm": "bharat-kyc-dev",
+  "enabled": true,
+  "displayName": "Bharat KYC Dev",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "rememberMe": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "clients": [
+    {
+      "clientId": "wallet-client",
+      "name": "Wallet Web Client",
+      "description": "Public client for wallet web-ui auth-code flow",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "secret": "",
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://bharat-kyc.local:8081/*",
+        "http://bharat-kyc.local:8081/"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://bharat-kyc.local:8081"
+      ],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "consent.read",
+        "consent.approve",
+        "token.read",
+        "kyc.request",
+        "kyc.verify",
+        "token.issue",
+        "token.revoke"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "clientId": "fi-client",
+      "name": "FI Service Client",
+      "description": "Confidential FI client for browser login + service client-credentials flow",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "fi-client-secret",
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://localhost:5173/",
+        "http://localhost:5173/console",
+        "http://localhost:5173/fi/*",
+        "http://localhost:5173/wallet/*",
+        "http://bharat-kyc.local:8081/*",
+        "http://bharat-kyc.local:8081/",
+        "http://bharat-kyc.local:8081/console",
+        "http://bharat-kyc.local:8081/fi/*",
+        "http://bharat-kyc.local:8081/wallet/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://bharat-kyc.local:8081"
+      ],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "kyc.request",
+        "kyc.verify"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "clientId": "fi-client-2",
+      "name": "FI Service Client #2",
+      "description": "Second confidential FI client for token reuse branch",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "fi-client-2-secret",
+      "redirectUris": [],
+      "webOrigins": [],
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "kyc.request",
+        "kyc.verify"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "clientId": "issuer-admin",
+      "name": "Issuer Admin Client",
+      "description": "Confidential client for issuer admin client-credentials flow",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "issuer-admin-secret",
+      "redirectUris": [],
+      "webOrigins": [],
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "token.issue",
+        "token.revoke"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "kyc.request",
+      "description": "Permission to initiate KYC requests",
+      "protocol": "openid-connect",
+      "attributes": {
+        "display.on.consent.screen": "false",
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "kyc.verify",
+      "description": "Permission to verify KYC tokens",
+      "protocol": "openid-connect",
+      "attributes": {
+        "display.on.consent.screen": "false",
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "consent.read",
+      "description": "Permission to read consent objects",
+      "protocol": "openid-connect",
+      "attributes": {
+        "display.on.consent.screen": "false",
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "consent.approve",
+      "description": "Permission to approve consent objects",
+      "protocol": "openid-connect",
+      "attributes": {
+        "display.on.consent.screen": "false",
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "token.read",
+      "description": "Permission to read token data",
+      "protocol": "openid-connect",
+      "attributes": {
+        "display.on.consent.screen": "false",
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "token.issue",
+      "description": "Permission to issue new KYC tokens",
+      "protocol": "openid-connect",
+      "attributes": {
+        "display.on.consent.screen": "false",
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "token.revoke",
+      "description": "Permission to revoke KYC tokens",
+      "protocol": "openid-connect",
+      "attributes": {
+        "display.on.consent.screen": "false",
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": []
+    }
+  ],
+  "users": [
+    {
+      "username": "wallet-owner-1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Wallet",
+      "lastName": "Owner",
+      "email": "wallet-owner-1@example.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "wallet-owner-1-pass",
+          "temporary": false
+        }
+      ],
+      "requiredActions": []
+    },
+    {
+      "username": "wallet-user",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Wallet",
+      "lastName": "User",
+      "email": "wallet-user@example.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "wallet-pass",
+          "temporary": false
+        }
+      ],
+      "requiredActions": []
+    },
+    {
+      "username": "wallet-nominee",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Wallet",
+      "lastName": "Nominee",
+      "email": "wallet-nominee@example.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "wallet-nominee-pass",
+          "temporary": false
+        }
+      ],
+      "requiredActions": []
+    },
+    {
+      "username": "fi-analyst-1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "FI",
+      "lastName": "Analyst One",
+      "email": "fi-analyst-1@example.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "fi-analyst-1-pass",
+          "temporary": false
+        }
+      ],
+      "requiredActions": []
+    },
+    {
+      "username": "fi-analyst-2",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "FI",
+      "lastName": "Analyst Two",
+      "email": "fi-analyst-2@example.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "fi-analyst-2-pass",
+          "temporary": false
+        }
+      ],
+      "requiredActions": []
+    }
+  ]
+}

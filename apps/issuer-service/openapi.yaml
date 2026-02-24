@@ -1,0 +1,156 @@
+openapi: 3.0.3
+info:
+  title: Issuer Service API
+  version: 2.0.0
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /v1/health:
+    get:
+      summary: Health probe
+      parameters:
+        - in: query
+          name: probe
+          schema:
+            type: string
+            enum: [liveness, readiness]
+      responses:
+        '200':
+          description: Healthy
+        '503':
+          description: Unhealthy
+  /.well-known/jwks.json:
+    get:
+      summary: Issuer JWKS endpoint
+      responses:
+        '200':
+          description: Public signing keys
+  /v1/internal/issuer/token/{tokenId}/payload:
+    get:
+      summary: Internal payload fetch for consent selective disclosure
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: tokenId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Decrypted KYC payload
+        '403':
+          description: Missing token.issue scope
+  /v1/issuer/kyc/issue:
+    post:
+      summary: Issue KYC Token JWT
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kyc]
+              properties:
+                ttlSeconds:
+                  type: integer
+                kyc:
+                  type: object
+                  required: [fullName, dob, idNumber]
+                  properties:
+                    fullName:
+                      type: string
+                    dob:
+                      type: string
+                    idNumber:
+                      type: string
+                    email:
+                      type: string
+                    phone:
+                      type: string
+                    addressLine1:
+                      type: string
+                    pincode:
+                      type: string
+      responses:
+        '201':
+          description: KYC token issued
+        '403':
+          description: Missing token.issue scope
+  /v1/issuer/token/{tokenId}/revoke:
+    post:
+      summary: Revoke token by tokenId
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: tokenId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Token revoked
+        '403':
+          description: Missing token.revoke scope
+  /v1/issuer/token/{tokenId}/supersede:
+    post:
+      summary: Supersede old token with new active token
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: tokenId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kyc]
+              properties:
+                ttlSeconds:
+                  type: integer
+                reason:
+                  type: string
+                kyc:
+                  type: object
+                  required: [fullName, dob, idNumber]
+                  properties:
+                    fullName:
+                      type: string
+                    dob:
+                      type: string
+                    idNumber:
+                      type: string
+                    email:
+                      type: string
+                    phone:
+                      type: string
+                    addressLine1:
+                      type: string
+                    pincode:
+                      type: string
+      responses:
+        '201':
+          description: Token superseded
+        '403':
+          description: Missing token.issue scope

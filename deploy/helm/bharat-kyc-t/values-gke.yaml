@@ -1,0 +1,134 @@
+serviceAccount:
+  create: true
+  name: bharat-kyc-ksa
+  annotations:
+    iam.gke.io/gcp-service-account: bharat-kyc-workload@REPLACE_PROJECT_ID.iam.gserviceaccount.com
+
+global:
+  imagePullPolicy: IfNotPresent
+  database:
+    host: 127.0.0.1
+    port: 5432
+    name: bharat
+    user: bharat
+    password: "REPLACE_WITH_CLOUDSQL_PASSWORD"
+  cloudSqlAuthProxy:
+    enabled: true
+    instanceConnectionName: "REPLACE_PROJECT_ID:REPLACE_REGION:REPLACE_INSTANCE"
+    port: 5432
+    privateIP: true
+    autoIAMAuthn: true
+  redis:
+    host: "10.0.0.11"
+    port: 6379
+    url: "redis://10.0.0.11:6379"
+  keycloak:
+    issuerUrl: https://auth.example.com/realms/bharat-kyc-dev
+    tokenUrl: https://auth.example.com/realms/bharat-kyc-dev/protocol/openid-connect/token
+    jwksUrl: https://auth.example.com/realms/bharat-kyc-dev/protocol/openid-connect/certs
+  registryUrl: http://registry-service:3002
+  consentManagerUrl: http://consent-manager:3003
+  ckycAdapterUrl: http://ckyc-adapter:3006
+  issuerServiceUrl: http://issuer-service:3001
+  dependencies:
+    postgres:
+      enabled: false
+    redis:
+      enabled: false
+    keycloak:
+      enabled: false
+
+ingress:
+  enabled: true
+  className: nginx
+  host: kyc.example.com
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    acme.cert-manager.io/http01-ingress-class: nginx
+  tls:
+    - hosts:
+        - kyc.example.com
+      secretName: bharat-kyc-tls
+
+services:
+  issuer-service:
+    image:
+      repository: ghcr.io/your-org/issuer-service
+      tag: latest
+  registry-service:
+    image:
+      repository: ghcr.io/your-org/registry-service
+      tag: latest
+  consent-manager:
+    image:
+      repository: ghcr.io/your-org/consent-manager
+      tag: latest
+    hpa:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 8
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 75
+  wallet-service:
+    image:
+      repository: ghcr.io/your-org/wallet-service
+      tag: latest
+  fi-service:
+    image:
+      repository: ghcr.io/your-org/fi-service
+      tag: latest
+    hpa:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 75
+  ckyc-adapter:
+    image:
+      repository: ghcr.io/your-org/ckyc-adapter
+      tag: latest
+  review-scheduler:
+    image:
+      repository: ghcr.io/your-org/review-scheduler
+      tag: latest
+  web-ui:
+    image:
+      repository: ghcr.io/your-org/web-ui
+      tag: latest
+    env:
+      - name: VITE_KEYCLOAK_URL
+        value: https://auth.example.com
+      - name: VITE_KEYCLOAK_REALM
+        value: bharat-kyc-dev
+      - name: VITE_KEYCLOAK_CLIENT_ID
+        value: wallet-client
+      - name: VITE_FI_KEYCLOAK_CLIENT_ID
+        value: fi-browser-client
+      - name: VITE_FI_CLIENT_ID
+        value: fi-client
+      - name: VITE_FI2_CLIENT_ID
+        value: fi-client-2
+      - name: API_PROXY_ISSUER
+        value: http://issuer-service:3001
+      - name: API_PROXY_REGISTRY
+        value: http://registry-service:3002
+      - name: API_PROXY_CONSENT
+        value: http://consent-manager:3003
+      - name: API_PROXY_WALLET
+        value: http://wallet-service:3004
+      - name: API_PROXY_FI
+        value: http://fi-service:3005
+      - name: API_PROXY_CKYC
+        value: http://ckyc-adapter:3006
+      - name: API_PROXY_REVIEW
+        value: http://review-scheduler:3007
+      - name: API_PROXY_KEYCLOAK
+        value: https://auth.example.com
+
+reviewSchedulerCron:
+  enabled: true
+  schedule: "0 */6 * * *"

@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1.6
+FROM node:20-bookworm-slim
+
+RUN apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy manifests first for better cache reuse
+COPY package.json package-lock.json* ./
+COPY tsconfig.base.json ./
+
+# Now copy the actual source
+COPY apps ./apps
+COPY packages ./packages
+
+# Install deps with cache mount (BuildKit)
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
+
+# Prisma generate once inside the image
+RUN npm -w packages/db run db:generate
+
+ENV SERVICE_NAME=""
+CMD ["sh", "-c", "npm run start -w apps/$SERVICE_NAME"]

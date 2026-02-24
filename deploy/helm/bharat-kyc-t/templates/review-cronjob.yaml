@@ -1,0 +1,98 @@
+{{- if .Values.reviewSchedulerCron.enabled }}
+{{- $svc := index .Values.services "review-scheduler" }}
+{{- $globalCloudSql := (.Values.global.cloudSqlAuthProxy | default dict) }}
+{{- $svcCloudSql := ($svc.cloudSqlAuthProxy | default dict) }}
+{{- $cloudSqlEnabled := or ($globalCloudSql.enabled | default false) ($svcCloudSql.enabled | default false) }}
+{{- $cloudSqlPort := ($svcCloudSql.port | default ($globalCloudSql.port | default 5432)) }}
+{{- $dbHost := .Values.global.database.host }}
+{{- $dbPort := .Values.global.database.port }}
+{{- if $cloudSqlEnabled }}
+{{- $dbHost = "127.0.0.1" }}
+{{- $dbPort = $cloudSqlPort }}
+{{- end }}
+{{- $databaseUrl := printf "postgresql://%s:%s@%s:%v/%s?schema=public" .Values.global.database.user .Values.global.database.password $dbHost $dbPort .Values.global.database.name }}
+{{- $redisUrl := (.Values.global.redis.url | default (printf "redis://%s:%v" .Values.global.redis.host .Values.global.redis.port)) }}
+{{- $serviceAccountName := "" }}
+{{- if .Values.serviceAccount.create }}
+{{- $serviceAccountName = (default (include "bharat-kyc-t.fullname" .) .Values.serviceAccount.name) }}
+{{- else if .Values.serviceAccount.name }}
+{{- $serviceAccountName = .Values.serviceAccount.name }}
+{{- end }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: review-scheduler-cron
+spec:
+  schedule: "{{ .Values.reviewSchedulerCron.schedule }}"
+  successfulJobsHistoryLimit: {{ .Values.reviewSchedulerCron.successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .Values.reviewSchedulerCron.failedJobsHistoryLimit | default 3 }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+{{- with .Values.global.imagePullSecrets }}
+          imagePullSecrets:
+{{ toYaml . | nindent 12 }}
+{{- end }}
+{{- if $serviceAccountName }}
+          serviceAccountName: {{ $serviceAccountName }}
+{{- end }}
+          containers:
+            - name: review-scheduler
+              image: "{{ $svc.image.repository }}:{{ $svc.image.tag }}"
+              imagePullPolicy: {{ $svc.image.pullPolicy | default $.Values.global.imagePullPolicy }}
+              env:
+                - name: SERVICE_NAME
+                  value: "{{ $svc.serviceName | default "review-scheduler" }}"
+                - name: PORT
+                  value: "{{ $svc.port }}"
+                - name: RUN_ONCE
+                  value: "true"
+                - name: DATABASE_URL
+                  value: "{{ $databaseUrl }}"
+                - name: REDIS_URL
+                  value: "{{ $redisUrl }}"
+                - name: REDIS_HOST
+                  value: "{{ $.Values.global.redis.host }}"
+                - name: REDIS_PORT
+                  value: "{{ $.Values.global.redis.port }}"
+                - name: CKYC_ADAPTER_URL
+                  value: "{{ $.Values.global.ckycAdapterUrl }}"
+                - name: KEYCLOAK_ISSUER_URL
+                  value: "{{ $.Values.global.keycloak.issuerUrl }}"
+                - name: KEYCLOAK_TOKEN_URL
+                  value: "{{ $.Values.global.keycloak.tokenUrl }}"
+{{- if $.Values.global.keycloak.jwksUrl }}
+                - name: KEYCLOAK_JWKS_URL
+                  value: "{{ $.Values.global.keycloak.jwksUrl }}"
+{{- end }}
+{{- with $svc.env }}
+{{ toYaml . | nindent 16 }}
+{{- end }}
+              resources:
+{{ toYaml ($svc.resources | default $.Values.global.defaultResources) | nindent 16 }}
+{{- if $cloudSqlEnabled }}
+            - name: cloud-sql-proxy
+              image: "{{ $svcCloudSql.image | default $globalCloudSql.image }}"
+              imagePullPolicy: {{ $svcCloudSql.imagePullPolicy | default ($globalCloudSql.imagePullPolicy | default "IfNotPresent") }}
+              args:
+                - "--structured-logs"
+                - "--address=0.0.0.0"
+                - "--port={{ $cloudSqlPort }}"
+{{- if ($svcCloudSql.privateIP | default ($globalCloudSql.privateIP | default false)) }}
+                - "--private-ip"
+{{- end }}
+{{- if ($svcCloudSql.autoIAMAuthn | default ($globalCloudSql.autoIAMAuthn | default false)) }}
+                - "--auto-iam-authn"
+{{- end }}
+{{- range $arg := ($svcCloudSql.extraArgs | default ($globalCloudSql.extraArgs | default list)) }}
+                - {{ $arg | quote }}
+{{- end }}
+                - "{{ required "Cloud SQL proxy enabled for review-scheduler CronJob, but instanceConnectionName is empty" ($svcCloudSql.instanceConnectionName | default $globalCloudSql.instanceConnectionName) }}"
+              securityContext:
+                runAsNonRoot: true
+              resources:
+{{ toYaml ($svcCloudSql.resources | default ($globalCloudSql.resources | default dict)) | nindent 16 }}
+{{- end }}
+{{- end }}

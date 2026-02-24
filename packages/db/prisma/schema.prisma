@@ -1,0 +1,313 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RegistryStatus {
+  ACTIVE
+  REVOKED
+  SUPERSEDED
+  EXPIRED
+}
+
+model TokenRegistry {
+  id         String   @id @default(uuid())
+  jti        String   @unique
+  subject    String
+  piiHash    String
+  issuer     String
+  purpose    String
+  issuedAt   DateTime
+  expiresAt  DateTime
+  status     String   @default("ACTIVE")
+  ckycStatus String?  @default("PENDING")
+  createdAt  DateTime @default(now())
+}
+
+model RegistryRecord {
+  tokenId      String         @id @map("token_id")
+  issuerId     String         @map("issuer_id")
+  userRefHash  String         @map("user_ref_hash")
+  status       RegistryStatus @default(ACTIVE)
+  version      Int            @default(1)
+  issuedAt     DateTime       @map("issued_at")
+  expiresAt    DateTime       @map("expires_at")
+  supersededBy String?        @map("superseded_by")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  auditEvents AuditEvent[]
+
+  @@map("token_registry")
+}
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  tokenId   String   @map("token_id")
+  eventType String   @map("event_type")
+  actor     String?
+  detail    Json?
+  hashPrev  String?  @map("hash_prev")
+  hashCurr  String   @map("hash_curr")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  token RegistryRecord @relation(fields: [tokenId], references: [tokenId], onDelete: Cascade)
+
+  @@index([tokenId, createdAt])
+  @@map("audit_event")
+}
+
+model RevokedToken {
+  id        String   @id @default(uuid())
+  jti       String   @unique
+  reason    String?
+  revokedAt DateTime @default(now())
+}
+
+model Consent {
+  id        String   @id @default(uuid())
+  subject   String
+  purpose   String
+  scope     String?
+  createdAt DateTime @default(now())
+}
+
+enum ConsentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  REVOKED
+}
+
+enum ConsentActorType {
+  OWNER
+  DELEGATE
+}
+
+enum DelegationStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum NomineeStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum RiskTier {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model ConsentRecord {
+  id              String       @id @default(uuid()) @map("consent_id")
+  userRefHash     String       @map("user_ref_hash")
+  fiId            String       @map("fi_id")
+  purpose         String
+  requestedFields Json         @map("requested_fields")
+  approvedFields  Json?        @map("approved_fields")
+  requiresDelegation Boolean   @default(false) @map("requires_delegation")
+  allowReuseAcrossFIs Boolean  @default(false) @map("allow_reuse_across_fis")
+  tokenId         String       @map("token_id")
+  nonce           String
+  expiresAt       DateTime     @default(now()) @map("expires_at")
+  renewedFromConsentId String? @map("renewed_from_consent_id")
+  status          ConsentStatus @default(PENDING)
+  actorType       ConsentActorType? @map("actor_type")
+  approvedBy      String?      @map("approved_by")
+  delegationId    String?      @map("delegation_id")
+  assertionJti    String?      @map("assertion_jti")
+  assertionJwt    String?      @map("assertion_jwt")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  auditEvents ConsentAuditEvent[]
+
+  @@index([userRefHash, createdAt])
+  @@index([tokenId])
+  @@map("consent_record")
+}
+
+model Nominee {
+  id             String        @id @default(uuid())
+  ownerUserId    String        @map("owner_user_id")
+  ownerRefHash   String        @map("owner_ref_hash")
+  nomineeUserId  String        @map("nominee_user_id")
+  nomineeRefHash String        @map("nominee_ref_hash")
+  status         NomineeStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@index([ownerRefHash, status])
+  @@unique([ownerRefHash, nomineeRefHash])
+  @@map("nominee")
+}
+
+model Delegation {
+  id             String           @id @default(uuid())
+  ownerUserId    String           @map("owner_user_id")
+  ownerRefHash   String           @map("owner_ref_hash")
+  delegateUserId String           @map("delegate_user_id")
+  delegateRefHash String          @map("delegate_ref_hash")
+  scope          String
+  allowedPurposes String[]        @default([]) @map("allowed_purposes")
+  allowedFields  String[]         @default([]) @map("allowed_fields")
+  status         DelegationStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  expiresAt      DateTime         @map("expires_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@index([ownerRefHash, status, scope])
+  @@index([delegateRefHash, status, scope])
+  @@map("delegation")
+}
+
+model ConsentAuditEvent {
+  id        String   @id @default(cuid())
+  consentId String   @map("consent_id")
+  eventType String   @map("event_type")
+  actor     String?
+  detail    Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  consent ConsentRecord @relation(fields: [consentId], references: [id], onDelete: Cascade)
+
+  @@index([consentId, createdAt])
+  @@map("consent_audit_event")
+}
+
+model FiKycRequest {
+  id              String   @id @default(uuid())
+  consentId       String   @unique @map("consent_id")
+  userRefHash     String   @map("user_ref_hash")
+  fiId            String   @map("fi_id")
+  purpose         String
+  requestedFields Json     @map("requested_fields")
+  tokenId         String   @map("token_id")
+  nonce           String
+  status          String   @default("PENDING")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  auditEvents FiAuditEvent[]
+
+  @@index([fiId, createdAt])
+  @@index([tokenId])
+  @@map("fi_kyc_request")
+}
+
+model FiAuditEvent {
+  id          String   @id @default(cuid())
+  fiRequestId String?  @map("fi_request_id")
+  eventType   String   @map("event_type")
+  success     Boolean?
+  reason      String?
+  detail      Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  fiRequest FiKycRequest? @relation(fields: [fiRequestId], references: [id], onDelete: SetNull)
+
+  @@index([fiRequestId, createdAt])
+  @@map("fi_audit_event")
+}
+
+model CkycProfile {
+  userId            String   @id @map("user_id")
+  profileVersion    Int      @default(1) @map("profile_version")
+  lastUpdated       DateTime @map("last_updated")
+  hash              String
+  payload           Json
+  lastSyncedHash    String?  @map("last_synced_hash")
+  lastSyncedVersion Int?     @map("last_synced_version")
+  lastSyncedTokenId String?  @map("last_synced_token_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  auditEvents CkycAuditEvent[]
+
+  @@map("ckyc_profile")
+}
+
+model CkycAuditEvent {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  eventType String   @map("event_type")
+  actor     String?
+  detail    Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  profile CkycProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("ckyc_audit_event")
+}
+
+model ReviewCustomer {
+  userId            String    @id @map("user_id")
+  userRefHash       String    @map("user_ref_hash")
+  riskTier          RiskTier  @map("risk_tier")
+  lastKycUpdateAt   DateTime  @map("last_kyc_update_at")
+  nextReviewAt      DateTime  @map("next_review_at")
+  requiresReconsent Boolean   @default(false) @map("requires_reconsent")
+  status            String    @default("ACTIVE")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  auditEvents ReviewAuditEvent[]
+
+  @@index([nextReviewAt])
+  @@map("review_customer")
+}
+
+model ReviewAuditEvent {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  eventType String   @map("event_type")
+  actor     String?
+  detail    Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  customer ReviewCustomer @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("review_audit_event")
+}
+
+model WalletItem {
+  id        String   @id @default(uuid())
+  jti       String
+  subject   String
+  consentId String
+  storedAt  DateTime @default(now())
+}
+
+model ReviewJob {
+  id        String   @id @default(uuid())
+  status    String
+  detail    String?
+  createdAt DateTime @default(now())
+  runAt     DateTime?
+}
+
+model IssuerVault {
+  id               String   @id
+  tokenId          String   @map("token_id")
+  version          Int
+  encryptedPayload String   @map("encrypted_payload")
+  encryptionIv     String   @map("encryption_iv")
+  encryptionTag    String   @map("encryption_tag")
+  tokenJwt         String   @map("token_jwt")
+  userRefHash      String   @map("user_ref_hash")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@unique([tokenId, version])
+  @@index([tokenId])
+  @@map("issuer_vault")
+}

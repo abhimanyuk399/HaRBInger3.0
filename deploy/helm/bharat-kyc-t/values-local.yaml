@@ -1,0 +1,71 @@
+global:
+  database:
+    host: postgres
+    port: 5432
+    name: bharat
+    user: bharat
+    password: bharat
+  redis:
+    host: redis
+    port: 6379
+  keycloak:
+    issuerUrl: http://keycloak:8080/realms/bharat-kyc-dev
+    tokenUrl: http://keycloak:8080/realms/bharat-kyc-dev/protocol/openid-connect/token
+  dependencies:
+    postgres:
+      enabled: true
+      serviceName: postgres
+    redis:
+      enabled: true
+      serviceName: redis
+    keycloak:
+      enabled: true
+      serviceName: keycloak
+      adminUser: admin
+      adminPassword: admin
+
+ingress:
+  enabled: true
+  className: nginx
+  host: bharat-kyc.local
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+  tls: []
+
+services:
+  issuer-service:
+    image:
+      repository: bharat/issuer-service
+      tag: local
+  registry-service:
+    image:
+      repository: bharat/registry-service
+      tag: local
+  consent-manager:
+    image:
+      repository: bharat/consent-manager
+      tag: local
+  wallet-service:
+    image:
+      repository: bharat/wallet-service
+      tag: local
+  fi-service:
+    image:
+      repository: bharat/fi-service
+      tag: local
+  ckyc-adapter:
+    image:
+      repository: bharat/ckyc-adapter
+      tag: local
+  review-scheduler:
+    image:
+      repository: bharat/review-scheduler
+      tag: local
+  web-ui:
+    image:
+      repository: bharat/web-ui
+      tag: local
+
+reviewSchedulerCron:
+  enabled: false

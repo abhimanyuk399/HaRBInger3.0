@@ -1,0 +1,88 @@
+openapi: 3.0.3
+info:
+  title: CKYC Adapter API
+  version: 2.0.0
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /v1/health:
+    get:
+      summary: Health probe
+      parameters:
+        - in: query
+          name: probe
+          schema:
+            type: string
+            enum: [liveness, readiness]
+      responses:
+        '200':
+          description: Healthy
+        '503':
+          description: Unhealthy
+  /v1/ckyc/profile/{userId}:
+    get:
+      summary: Read current mock CKYC profile for user
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: CKYC profile snapshot
+  /v1/ckyc/simulate-update/{userId}:
+    post:
+      summary: Simulate CKYC update by incrementing profileVersion and changing address
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: CKYC profile updated
+  /v1/ckyc/sync/{userId}:
+    post:
+      summary: Internal sync endpoint that supersedes token when CKYC profile version/hash changed
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sync outcome
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userId:
+                    type: string
+                  changed:
+                    type: boolean
+                  reason:
+                    type: string
+                  profileVersion:
+                    type: integer
+                  oldTokenId:
+                    type: string
+                  oldStatus:
+                    type: string
+                    enum: [SUPERSEDED]
+                  newTokenId:
+                    type: string
+                  newStatus:
+                    type: string
+                    enum: [ACTIVE]
+        '403':
+          description: Missing token.issue scope

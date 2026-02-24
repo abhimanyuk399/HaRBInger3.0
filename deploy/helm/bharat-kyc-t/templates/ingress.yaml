@@ -1,0 +1,80 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "bharat-kyc-t.fullname" . }}
+{{- with .Values.ingress.annotations }}
+  annotations:
+{{ toYaml . | nindent 4 }}
+{{- end }}
+spec:
+{{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+{{- end }}
+  rules:
+    - {{- if .Values.ingress.host }}
+      host: {{ .Values.ingress.host | quote }}
+      {{- end }}
+      http:
+        paths:
+          - path: /api/issuer(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: issuer-service
+                port:
+                  number: {{ (index .Values.services "issuer-service").servicePort | default (index .Values.services "issuer-service").port }}
+          - path: /api/fi(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: fi-service
+                port:
+                  number: {{ (index .Values.services "fi-service").servicePort | default (index .Values.services "fi-service").port }}
+          - path: /api/consent(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: consent-manager
+                port:
+                  number: {{ (index .Values.services "consent-manager").servicePort | default (index .Values.services "consent-manager").port }}
+          - path: /api/registry(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: registry-service
+                port:
+                  number: {{ (index .Values.services "registry-service").servicePort | default (index .Values.services "registry-service").port }}
+          - path: /api/wallet(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: wallet-service
+                port:
+                  number: {{ (index .Values.services "wallet-service").servicePort | default (index .Values.services "wallet-service").port }}
+          - path: /api/ckyc(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: ckyc-adapter
+                port:
+                  number: {{ (index .Values.services "ckyc-adapter").servicePort | default (index .Values.services "ckyc-adapter").port }}
+          - path: /api/review(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: review-scheduler
+                port:
+                  number: {{ (index .Values.services "review-scheduler").servicePort | default (index .Values.services "review-scheduler").port }}
+          - path: /()(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: web-ui
+                port:
+                  number: {{ (index .Values.services "web-ui").servicePort | default (index .Values.services "web-ui").port }}
+{{- with .Values.ingress.tls }}
+  tls:
+{{ toYaml . | nindent 4 }}
+{{- end }}
+{{- end }}

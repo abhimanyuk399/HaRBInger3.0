@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1.6
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Prisma/JWT runtime dependencies for tests and local verification tooling.
+RUN apk add --no-cache openssl
+
+# Copy root manifests first
+COPY package.json package-lock.json* ./
+COPY tsconfig.base.json ./
+
+# Copy workspace sources so npm workspaces resolve correctly
+COPY apps ./apps
+COPY packages ./packages
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
+
+RUN npm run -w packages/db db:generate
+
+CMD ["sh", "-c", "npm run dev -w apps/web-ui -- --host 0.0.0.0 --port 5173"]

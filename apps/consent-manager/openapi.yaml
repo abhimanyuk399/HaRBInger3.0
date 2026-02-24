@@ -1,0 +1,289 @@
+openapi: 3.0.3
+info:
+  title: Consent Manager API
+  version: 2.0.0
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /v1/health:
+    get:
+      summary: Health probe
+      parameters:
+        - in: query
+          name: probe
+          schema:
+            type: string
+            enum: [liveness, readiness]
+      responses:
+        '200':
+          description: Healthy
+        '503':
+          description: Unhealthy
+  /.well-known/jwks.json:
+    get:
+      summary: Consent manager JWKS endpoint
+      responses:
+        '200':
+          description: Public signing keys
+  /v1/consent/create:
+    post:
+      summary: Create consent request
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, fiId, purpose, requestedFields]
+              properties:
+                userId:
+                  type: string
+                fiId:
+                  type: string
+                purpose:
+                  type: string
+                requestedFields:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Consent created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  consentId:
+                    type: string
+                    format: uuid
+                  fiId:
+                    type: string
+                  purpose:
+                    type: string
+                  tokenId:
+                    type: string
+                  status:
+                    type: string
+                  nonce:
+                    type: string
+                  requestedFields:
+                    type: array
+                    items:
+                      type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  renewedFromConsentId:
+                    type: string
+                    nullable: true
+        '403':
+          description: Missing kyc.request scope
+  /v1/consent/{consentId}/renew:
+    post:
+      summary: Renew consent for same FI/purpose/scope without changing token
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: consentId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '201':
+          description: Consent renewed
+        '403':
+          description: Missing kyc.request scope
+        '404':
+          description: consent_not_found
+        '409':
+          description: token_not_active
+  /v1/internal/consent/{consentId}/binding:
+    get:
+      summary: Read consent binding for FI verification
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: consentId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Consent binding payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  consentId:
+                    type: string
+                    format: uuid
+                  fiId:
+                    type: string
+                  purpose:
+                    type: string
+                  requestedFields:
+                    type: array
+                    items:
+                      type: string
+                  tokenId:
+                    type: string
+                  status:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  renewedFromConsentId:
+                    type: string
+                    nullable: true
+        '403':
+          description: Missing kyc.verify scope
+        '404':
+          description: Consent not found
+  /v1/consent/{consentId}/approve:
+    post:
+      summary: Approve consent and issue assertion JWT
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: consentId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Consent approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  consentId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                  actorType:
+                    type: string
+                    enum: [OWNER, DELEGATE]
+                  approvedBy:
+                    type: string
+                  approvalActor:
+                    type: string
+                  delegatedBy:
+                    type: string
+                    nullable: true
+                  delegatee:
+                    type: string
+                    nullable: true
+                  constraintsSnapshot:
+                    type: object
+                    nullable: true
+                    properties:
+                      allowedPurposes:
+                        type: array
+                        items:
+                          type: string
+                      allowedFields:
+                        type: array
+                        items:
+                          type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+        '403':
+          description: Missing consent.approve scope, delegation_required, or delegation_constraint_violation
+        '409':
+          description: consent_expired or invalid state
+  /v1/consent/{consentId}/reject:
+    post:
+      summary: Reject consent
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: consentId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Consent rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  consentId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                  actorType:
+                    type: string
+                    enum: [OWNER, DELEGATE]
+                  approvedBy:
+                    type: string
+                  approvalActor:
+                    type: string
+        '403':
+          description: Missing consent.approve scope or delegation_required
+        '409':
+          description: consent_expired or invalid state
+  /v1/consent/user/{userId}:
+    get:
+      summary: List user consents
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Consents for user
+        '403':
+          description: Missing consent.read scope

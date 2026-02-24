@@ -1,0 +1,353 @@
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  name: ""
+  annotations: {}
+
+global:
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  defaultResources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  jwt:
+    issuer: bharat-kyc
+    audience: bharat-kyc
+    jwksUrl: http://issuer-service:3001/.well-known/jwks.json
+  keycloak:
+    issuerUrl: http://keycloak:8080/realms/bharat-kyc-dev
+    tokenUrl: http://keycloak:8080/realms/bharat-kyc-dev/protocol/openid-connect/token
+    jwksUrl: ""
+  database:
+    host: postgres
+    port: 5432
+    name: bharat
+    user: bharat
+    password: bharat
+  redis:
+    host: redis
+    port: 6379
+    url: ""
+  cloudSqlAuthProxy:
+    enabled: false
+    instanceConnectionName: ""
+    port: 5432
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.3
+    privateIP: true
+    autoIAMAuthn: true
+    extraArgs: []
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+  registryUrl: http://registry-service:3002
+  consentManagerUrl: http://consent-manager:3003
+  ckycAdapterUrl: http://ckyc-adapter:3006
+  issuerServiceUrl: http://issuer-service:3001
+  dependencies:
+    postgres:
+      enabled: false
+      image: postgres:16
+      serviceName: postgres
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    redis:
+      enabled: false
+      image: redis:7
+      serviceName: redis
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 250m
+          memory: 256Mi
+    keycloak:
+      enabled: false
+      image: quay.io/keycloak/keycloak:24.0.1
+      serviceName: keycloak
+      port: 8080
+      adminUser: admin
+      adminPassword: admin
+      realm: bharat-kyc-dev
+      command:
+        - start-dev
+        - --http-port=8080
+        - --import-realm
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 1
+          memory: 1Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  host: bharat-kyc.local
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+  tls: []
+
+secrets:
+  issuer-service:
+    create: false
+    name: issuer-service-secrets
+    stringData:
+      JWT_PRIVATE_KEY: ""
+      VAULT_ENCRYPTION_KEY_BASE64: ""
+      ISSUER_ADMIN_CLIENT_SECRET: ""
+  consent-manager:
+    create: false
+    name: consent-manager-secrets
+    stringData:
+      CONSENT_SIGNING_PRIVATE_KEY: ""
+      CONSENT_SERVICE_CLIENT_SECRET: ""
+  review-scheduler:
+    create: false
+    name: review-scheduler-secrets
+    stringData:
+      REVIEW_SERVICE_CLIENT_SECRET: ""
+  web-ui:
+    create: false
+    name: web-ui-secrets
+    stringData: {}
+
+services:
+  issuer-service:
+    enabled: true
+    kind: backend
+    serviceName: issuer-service
+    replicas: 1
+    port: 3001
+    image:
+      repository: ghcr.io/replace-me/issuer-service
+      tag: latest
+    probePath: /v1/health
+    resources:
+      requests:
+        cpu: 150m
+        memory: 192Mi
+      limits:
+        cpu: 700m
+        memory: 768Mi
+    env:
+      - name: JWT_PRIVATE_KEY
+        valueFrom:
+          secretKeyRef:
+            name: issuer-service-secrets
+            key: JWT_PRIVATE_KEY
+      - name: JWT_KID
+        value: issuer-key
+      - name: ISSUER_ID
+        value: bharat-issuer
+      - name: TOKEN_TTL_SECONDS
+        value: "900"
+      - name: VAULT_ENCRYPTION_KEY_BASE64
+        valueFrom:
+          secretKeyRef:
+            name: issuer-service-secrets
+            key: VAULT_ENCRYPTION_KEY_BASE64
+      - name: ISSUER_ADMIN_CLIENT_ID
+        value: issuer-admin
+      - name: ISSUER_ADMIN_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: issuer-service-secrets
+            key: ISSUER_ADMIN_CLIENT_SECRET
+
+  registry-service:
+    enabled: true
+    kind: backend
+    serviceName: registry-service
+    replicas: 1
+    port: 3002
+    image:
+      repository: ghcr.io/replace-me/registry-service
+      tag: latest
+    probePath: /v1/health
+
+  consent-manager:
+    enabled: true
+    kind: backend
+    serviceName: consent-manager
+    replicas: 1
+    port: 3003
+    image:
+      repository: ghcr.io/replace-me/consent-manager
+      tag: latest
+    probePath: /v1/health
+    resources:
+      requests:
+        cpu: 150m
+        memory: 192Mi
+      limits:
+        cpu: 800m
+        memory: 768Mi
+    hpa:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 4
+      targetCPUUtilizationPercentage: 70
+    env:
+      - name: CONSENT_SIGNING_PRIVATE_KEY
+        valueFrom:
+          secretKeyRef:
+            name: consent-manager-secrets
+            key: CONSENT_SIGNING_PRIVATE_KEY
+      - name: CONSENT_SIGNING_KID
+        value: consent-key
+      - name: CONSENT_ISSUER_ID
+        value: bharat-consent-manager
+      - name: CONSENT_SERVICE_CLIENT_ID
+        value: issuer-admin
+      - name: CONSENT_SERVICE_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: consent-manager-secrets
+            key: CONSENT_SERVICE_CLIENT_SECRET
+
+  wallet-service:
+    enabled: true
+    kind: backend
+    serviceName: wallet-service
+    replicas: 1
+    port: 3004
+    image:
+      repository: ghcr.io/replace-me/wallet-service
+      tag: latest
+    probePath: /v1/health
+
+  fi-service:
+    enabled: true
+    kind: backend
+    serviceName: fi-service
+    replicas: 1
+    port: 3005
+    image:
+      repository: ghcr.io/replace-me/fi-service
+      tag: latest
+    probePath: /v1/health
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+    hpa:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+    env:
+      - name: CONSENT_JWKS_URL
+        value: http://consent-manager:3003/.well-known/jwks.json
+      - name: CONSENT_ISSUER_ID
+        value: bharat-consent-manager
+      - name: CONSENT_JWKS_CACHE_TTL_MS
+        value: "600000"
+
+  ckyc-adapter:
+    enabled: true
+    kind: backend
+    serviceName: ckyc-adapter
+    replicas: 1
+    port: 3006
+    image:
+      repository: ghcr.io/replace-me/ckyc-adapter
+      tag: latest
+    probePath: /v1/health
+
+  review-scheduler:
+    enabled: true
+    kind: backend
+    serviceName: review-scheduler
+    replicas: 1
+    port: 3007
+    image:
+      repository: ghcr.io/replace-me/review-scheduler
+      tag: latest
+    probePath: /v1/health
+    env:
+      - name: REVIEW_SERVICE_CLIENT_ID
+        value: issuer-admin
+      - name: REVIEW_SERVICE_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: review-scheduler-secrets
+            key: REVIEW_SERVICE_CLIENT_SECRET
+      - name: REVIEW_PERIOD_HIGH_YEARS
+        value: "2"
+      - name: REVIEW_PERIOD_MEDIUM_YEARS
+        value: "8"
+      - name: REVIEW_PERIOD_LOW_YEARS
+        value: "10"
+
+  web-ui:
+    enabled: true
+    kind: web
+    replicas: 1
+    port: 5173
+    image:
+      repository: ghcr.io/replace-me/web-ui
+      tag: latest
+    probePath: /
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    env:
+      - name: VITE_KEYCLOAK_URL
+        value: http://localhost:8080
+      - name: VITE_KEYCLOAK_REALM
+        value: bharat-kyc-dev
+      - name: VITE_KEYCLOAK_CLIENT_ID
+        value: wallet-client
+      - name: VITE_FI_KEYCLOAK_CLIENT_ID
+        value: fi-browser-client
+      - name: VITE_FI_CLIENT_ID
+        value: fi-client
+      - name: VITE_FI2_CLIENT_ID
+        value: fi-client-2
+      - name: API_PROXY_ISSUER
+        value: http://issuer-service:3001
+      - name: API_PROXY_REGISTRY
+        value: http://registry-service:3002
+      - name: API_PROXY_CONSENT
+        value: http://consent-manager:3003
+      - name: API_PROXY_WALLET
+        value: http://wallet-service:3004
+      - name: API_PROXY_FI
+        value: http://fi-service:3005
+      - name: API_PROXY_CKYC
+        value: http://ckyc-adapter:3006
+      - name: API_PROXY_REVIEW
+        value: http://review-scheduler:3007
+      - name: API_PROXY_KEYCLOAK
+        value: http://keycloak:8080
+
+reviewSchedulerCron:
+  enabled: false
+  schedule: "0 */6 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3

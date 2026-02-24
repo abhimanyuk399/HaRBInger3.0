@@ -1,0 +1,150 @@
+openapi: 3.0.3
+info:
+  title: Registry Service API
+  version: 2.0.0
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /v1/health:
+    get:
+      summary: Health probe
+      parameters:
+        - in: query
+          name: probe
+          schema:
+            type: string
+            enum: [liveness, readiness]
+      responses:
+        '200':
+          description: Healthy
+        '503':
+          description: Unhealthy
+  /v1/registry/token/{tokenId}:
+    get:
+      summary: Get token registry record
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: tokenId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Token registry data
+        '403':
+          description: Missing kyc.verify scope
+  /v1/internal/registry/active-token:
+    get:
+      summary: Get latest ACTIVE token by userRefHash
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: userRefHash
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Active token metadata
+        '403':
+          description: Missing token.issue scope
+  /v1/internal/registry/token/{tokenId}:
+    get:
+      summary: Get token registry record (internal issuer/adapter)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: tokenId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Token registry data
+        '403':
+          description: Missing token.issue scope
+  /v1/registry/audit/{tokenId}:
+    get:
+      summary: Get append-only audit events for a token
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: tokenId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audit event list
+        '403':
+          description: Missing kyc.verify scope
+  /v1/internal/registry/token:
+    post:
+      summary: Create token registry record (internal issuer)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tokenId, issuerId, userRefHash, issuedAt, expiresAt]
+              properties:
+                tokenId:
+                  type: string
+                issuerId:
+                  type: string
+                userRefHash:
+                  type: string
+                issuedAt:
+                  type: string
+                  format: date-time
+                expiresAt:
+                  type: string
+                  format: date-time
+      responses:
+        '201':
+          description: Created
+        '403':
+          description: Missing token.issue scope
+  /v1/internal/registry/token/{tokenId}/status:
+    post:
+      summary: Update token status (internal issuer)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: tokenId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [REVOKED, SUPERSEDED, EXPIRED]
+                supersededBy:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Status updated
+        '403':
+          description: Missing token.revoke scope

@@ -1,0 +1,112 @@
+openapi: 3.0.3
+info:
+  title: Review Scheduler API
+  version: 2.0.0
+paths:
+  /v1/health:
+    get:
+      summary: Health probe
+      parameters:
+        - in: query
+          name: probe
+          schema:
+            type: string
+            enum: [liveness, readiness]
+      responses:
+        '200':
+          description: Healthy
+        '503':
+          description: Unhealthy
+  /v1/review/upsert-customer:
+    post:
+      summary: Upsert review profile for a customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, riskTier, lastKycUpdateAt]
+              properties:
+                userId:
+                  type: string
+                riskTier:
+                  type: string
+                  enum: [LOW, MEDIUM, HIGH]
+                lastKycUpdateAt:
+                  type: string
+                  format: date-time
+      responses:
+        '201':
+          description: Customer upserted
+  /v1/review/due:
+    get:
+      summary: List customers due for periodic KYC review
+      parameters:
+        - in: query
+          name: asOf
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Evaluate due status as-of this date (YYYY-MM-DD). Defaults to current time.
+      responses:
+        '200':
+          description: Due customer list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  asOf:
+                    type: string
+                    format: date-time
+                  periodicityYears:
+                    type: object
+                    properties:
+                      HIGH:
+                        type: integer
+                      MEDIUM:
+                        type: integer
+                      LOW:
+                        type: integer
+                  totalDue:
+                    type: integer
+                  dueUsers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: string
+                        riskTier:
+                          type: string
+                          enum: [LOW, MEDIUM, HIGH]
+                        nextReviewAt:
+                          type: string
+                          format: date-time
+                        plannedAction:
+                          type: string
+                          enum: [SYNC_CKYC, REQUEST_RECONSENT]
+                        reason:
+                          type: string
+                        intervalYears:
+                          type: integer
+  /v1/review/run-once:
+    post:
+      summary: Run one review cycle for due customers
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                actor:
+                  type: string
+                asOf:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Review cycle summary and actions taken

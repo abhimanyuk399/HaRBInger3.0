@@ -1,0 +1,380 @@
+services:
+  postgres:
+    container_name: harbinger2.0-postgres
+    image: postgres:16
+    environment:
+      POSTGRES_USER: bharat
+      POSTGRES_PASSWORD: bharat
+      POSTGRES_DB: bharat
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U bharat']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    container_name: harbinger2.0-redis
+    image: redis:7
+    ports:
+      - '6379:6379'
+
+  keycloak:
+    container_name: harbinger2.0-keycloak
+    image: quay.io/keycloak/keycloak:24.0.1
+    command: ['start-dev', '--http-port=8080', '--import-realm']
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?missing_KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?missing_KEYCLOAK_ADMIN_PASSWORD}
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_BACKCHANNEL: "false"
+    volumes:
+      - ./deploy/keycloak/dev-realm.json:/opt/keycloak/data/import/dev-realm.json:ro
+    ports:
+      - '8080:8080'
+
+  keycloak-bootstrap:
+    container_name: harbinger2.0-keycloak-bootstrap
+    image: node:20-alpine
+    depends_on:
+      keycloak:
+        condition: service_started
+    environment:
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: bharat-kyc-dev
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?missing_KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?missing_KEYCLOAK_ADMIN_PASSWORD}
+      KEYCLOAK_WALLET_OWNER_USER: ${KEYCLOAK_WALLET_OWNER_USER:?missing_KEYCLOAK_WALLET_OWNER_USER}
+      KEYCLOAK_WALLET_OWNER_PASSWORD: ${KEYCLOAK_WALLET_OWNER_PASSWORD:?missing_KEYCLOAK_WALLET_OWNER_PASSWORD}
+      KEYCLOAK_WALLET_OWNER_USER_ID: ${KEYCLOAK_WALLET_OWNER_USER_ID:-KYC-1234}
+      KEYCLOAK_NOMINEE_USER: ${KEYCLOAK_NOMINEE_USER:-wallet-nominee}
+      KEYCLOAK_NOMINEE_PASSWORD: ${KEYCLOAK_NOMINEE_PASSWORD:?missing_KEYCLOAK_NOMINEE_PASSWORD}
+      KEYCLOAK_FI_CLIENT_ID: ${KEYCLOAK_FI_CLIENT_ID:-fi-client}
+      KEYCLOAK_FI_CLIENT_SECRET: ${KEYCLOAK_FI_CLIENT_SECRET:?missing_KEYCLOAK_FI_CLIENT_SECRET}
+      KEYCLOAK_FI_BROWSER_CLIENT_ID: ${KEYCLOAK_FI_BROWSER_CLIENT_ID:-fi-browser-client}
+      KEYCLOAK_FI_USER_1: ${KEYCLOAK_FI_USER_1:-fi-analyst-1}
+      KEYCLOAK_FI_PASSWORD_1: ${KEYCLOAK_FI_PASSWORD_1:?missing_KEYCLOAK_FI_PASSWORD_1}
+      KEYCLOAK_FI_USER_2: ${KEYCLOAK_FI_USER_2:-fi-analyst-2}
+      KEYCLOAK_FI_PASSWORD_2: ${KEYCLOAK_FI_PASSWORD_2:?missing_KEYCLOAK_FI_PASSWORD_2}
+      KEYCLOAK_FI2_CLIENT_ID: ${KEYCLOAK_FI2_CLIENT_ID:-fi-client-2}
+      KEYCLOAK_FI2_CLIENT_SECRET: ${KEYCLOAK_FI2_CLIENT_SECRET:?missing_KEYCLOAK_FI2_CLIENT_SECRET}
+    command: ['node', '/opt/keycloak-bootstrap/bootstrap-keycloak.mjs']
+    volumes:
+      - ./deploy/keycloak/bootstrap-keycloak.mjs:/opt/keycloak-bootstrap/bootstrap-keycloak.mjs:ro
+
+  db-migrate:
+    container_name: harbinger2.0-db-migrate
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://bharat:bharat@postgres:5432/bharat?schema=public
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_INCLUDE_BODIES: ${LOG_INCLUDE_BODIES:-0}
+      LOG_HTTP_INCLUDE_HEADERS: ${LOG_HTTP_INCLUDE_HEADERS:-0}
+      LOG_PRETTY_JSON: ${LOG_PRETTY_JSON:-1}
+      LOG_SKIP_HEALTHCHECKS: ${LOG_SKIP_HEALTHCHECKS:-1}
+      LOG_HTTP_SUCCESS_LEVEL: ${LOG_HTTP_SUCCESS_LEVEL:-info}
+    command: ["sh", "-c", "npm run db:push -w packages/db"]
+
+  issuer-service:
+    container_name: harbinger2.0-issuer-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+    environment:
+      SERVICE_NAME: issuer-service
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_INCLUDE_BODIES: ${LOG_INCLUDE_BODIES:-0}
+      LOG_HTTP_INCLUDE_HEADERS: ${LOG_HTTP_INCLUDE_HEADERS:-0}
+      LOG_PRETTY_JSON: ${LOG_PRETTY_JSON:-1}
+      LOG_SKIP_HEALTHCHECKS: ${LOG_SKIP_HEALTHCHECKS:-1}
+      LOG_HTTP_SUCCESS_LEVEL: ${LOG_HTTP_SUCCESS_LEVEL:-info}
+      PORT: 3001
+      DATABASE_URL: postgresql://bharat:bharat@postgres:5432/bharat?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_ISSUER: bharat-kyc
+      JWT_AUDIENCE: bharat-kyc
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?missing_JWT_PRIVATE_KEY}
+      JWT_KID: issuer-key
+      REGISTRY_URL: http://registry-service:3002
+      TOKEN_TTL_SECONDS: 900
+      KEYCLOAK_ISSUER_URL: http://localhost:8080/realms/bharat-kyc-dev
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/bharat-kyc-dev/protocol/openid-connect/certs
+      KEYCLOAK_TOKEN_URL: http://keycloak:8080/realms/bharat-kyc-dev/protocol/openid-connect/token
+      ISSUER_ADMIN_CLIENT_ID: issuer-admin
+      ISSUER_ADMIN_CLIENT_SECRET: ${ISSUER_ADMIN_CLIENT_SECRET:?missing_ISSUER_ADMIN_CLIENT_SECRET}
+      VAULT_ENCRYPTION_KEY_BASE64: ${VAULT_ENCRYPTION_KEY_BASE64:?missing_VAULT_ENCRYPTION_KEY_BASE64}
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      keycloak-bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - '3001:3001'
+
+  registry-service:
+    container_name: harbinger2.0-registry-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+    environment:
+      SERVICE_NAME: registry-service
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_INCLUDE_BODIES: ${LOG_INCLUDE_BODIES:-0}
+      LOG_HTTP_INCLUDE_HEADERS: ${LOG_HTTP_INCLUDE_HEADERS:-0}
+      LOG_PRETTY_JSON: ${LOG_PRETTY_JSON:-1}
+      LOG_SKIP_HEALTHCHECKS: ${LOG_SKIP_HEALTHCHECKS:-1}
+      LOG_HTTP_SUCCESS_LEVEL: ${LOG_HTTP_SUCCESS_LEVEL:-info}
+      PORT: 3002
+      DATABASE_URL: postgresql://bharat:bharat@postgres:5432/bharat?schema=public
+      REDIS_URL: redis://redis:6379
+      KEYCLOAK_ISSUER_URL: http://localhost:8080/realms/bharat-kyc-dev
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/bharat-kyc-dev/protocol/openid-connect/certs
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    ports:
+      - '3002:3002'
+
+  consent-manager:
+    container_name: harbinger2.0-consent-manager
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+    environment:
+      SERVICE_NAME: consent-manager
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_INCLUDE_BODIES: ${LOG_INCLUDE_BODIES:-0}
+      LOG_HTTP_INCLUDE_HEADERS: ${LOG_HTTP_INCLUDE_HEADERS:-0}
+      LOG_PRETTY_JSON: ${LOG_PRETTY_JSON:-1}
+      LOG_SKIP_HEALTHCHECKS: ${LOG_SKIP_HEALTHCHECKS:-1}
+      LOG_HTTP_SUCCESS_LEVEL: ${LOG_HTTP_SUCCESS_LEVEL:-info}
+      PORT: 3003
+      DATABASE_URL: postgresql://bharat:bharat@postgres:5432/bharat?schema=public
+      REDIS_URL: redis://redis:6379
+      JWKS_URL: http://issuer-service:3001/.well-known/jwks.json
+      JWT_ISSUER: bharat-kyc
+      JWT_AUDIENCE: bharat-kyc
+      KEYCLOAK_ISSUER_URL: http://localhost:8080/realms/bharat-kyc-dev
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/bharat-kyc-dev/protocol/openid-connect/certs
+      KEYCLOAK_TOKEN_URL: http://keycloak:8080/realms/bharat-kyc-dev/protocol/openid-connect/token
+      REGISTRY_URL: http://registry-service:3002
+      CONSENT_SIGNING_PRIVATE_KEY: ${CONSENT_SIGNING_PRIVATE_KEY:?missing_CONSENT_SIGNING_PRIVATE_KEY}
+      CONSENT_SIGNING_KID: consent-key
+      CONSENT_ISSUER_ID: bharat-consent-manager
+      CONSENT_TTL_SECONDS: ${CONSENT_TTL_SECONDS:-300}
+      CONSENT_SERVICE_CLIENT_ID: issuer-admin
+      CONSENT_SERVICE_CLIENT_SECRET: ${CONSENT_SERVICE_CLIENT_SECRET:?missing_CONSENT_SERVICE_CLIENT_SECRET}
+      ISSUER_SERVICE_URL: http://issuer-service:3001
+      KEYCLOAK_WALLET_OWNER_USER: ${KEYCLOAK_WALLET_OWNER_USER:-wallet-owner-1}
+      KEYCLOAK_WALLET_OWNER_USER_ID: ${KEYCLOAK_WALLET_OWNER_USER_ID:-KYC-1234}
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      issuer-service:
+        condition: service_started
+      keycloak-bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - '3003:3003'
+
+  wallet-service:
+    container_name: harbinger2.0-wallet-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+    environment:
+      SERVICE_NAME: wallet-service
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_INCLUDE_BODIES: ${LOG_INCLUDE_BODIES:-0}
+      LOG_HTTP_INCLUDE_HEADERS: ${LOG_HTTP_INCLUDE_HEADERS:-0}
+      LOG_PRETTY_JSON: ${LOG_PRETTY_JSON:-1}
+      LOG_SKIP_HEALTHCHECKS: ${LOG_SKIP_HEALTHCHECKS:-1}
+      LOG_HTTP_SUCCESS_LEVEL: ${LOG_HTTP_SUCCESS_LEVEL:-info}
+      PORT: 3004
+      DATABASE_URL: postgresql://bharat:bharat@postgres:5432/bharat?schema=public
+      REDIS_URL: redis://redis:6379
+      JWKS_URL: http://issuer-service:3001/.well-known/jwks.json
+      JWT_ISSUER: bharat-kyc
+      JWT_AUDIENCE: bharat-kyc
+      KEYCLOAK_ISSUER_URL: http://localhost:8080/realms/bharat-kyc-dev
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/bharat-kyc-dev/protocol/openid-connect/certs
+      CONSENT_MANAGER_URL: http://consent-manager:3003
+      KEYCLOAK_WALLET_OWNER_USER: ${KEYCLOAK_WALLET_OWNER_USER:-wallet-owner-1}
+      KEYCLOAK_WALLET_OWNER_USER_ID: ${KEYCLOAK_WALLET_OWNER_USER_ID:-KYC-1234}
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      issuer-service:
+        condition: service_started
+      keycloak-bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - '3004:3004'
+
+  fi-service:
+    container_name: harbinger2.0-fi-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+    environment:
+      SERVICE_NAME: fi-service
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_INCLUDE_BODIES: ${LOG_INCLUDE_BODIES:-0}
+      LOG_HTTP_INCLUDE_HEADERS: ${LOG_HTTP_INCLUDE_HEADERS:-0}
+      LOG_PRETTY_JSON: ${LOG_PRETTY_JSON:-1}
+      LOG_SKIP_HEALTHCHECKS: ${LOG_SKIP_HEALTHCHECKS:-1}
+      LOG_HTTP_SUCCESS_LEVEL: ${LOG_HTTP_SUCCESS_LEVEL:-info}
+      PORT: 3005
+      DATABASE_URL: postgresql://bharat:bharat@postgres:5432/bharat?schema=public
+      REDIS_URL: redis://redis:6379
+      REGISTRY_URL: http://registry-service:3002
+      CONSENT_MANAGER_URL: http://consent-manager:3003
+      CONSENT_JWKS_URL: http://consent-manager:3003/.well-known/jwks.json
+      CONSENT_ISSUER_ID: bharat-consent-manager
+      CONSENT_JWKS_CACHE_TTL_MS: 600000
+      KEYCLOAK_ISSUER_URL: http://localhost:8080/realms/bharat-kyc-dev
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/bharat-kyc-dev/protocol/openid-connect/certs
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      issuer-service:
+        condition: service_started
+      keycloak-bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - '3005:3005'
+
+  ckyc-adapter:
+    container_name: harbinger2.0-ckyc-adapter
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+    environment:
+      SERVICE_NAME: ckyc-adapter
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_INCLUDE_BODIES: ${LOG_INCLUDE_BODIES:-0}
+      LOG_HTTP_INCLUDE_HEADERS: ${LOG_HTTP_INCLUDE_HEADERS:-0}
+      LOG_PRETTY_JSON: ${LOG_PRETTY_JSON:-1}
+      LOG_SKIP_HEALTHCHECKS: ${LOG_SKIP_HEALTHCHECKS:-1}
+      LOG_HTTP_SUCCESS_LEVEL: ${LOG_HTTP_SUCCESS_LEVEL:-info}
+      PORT: 3006
+      DATABASE_URL: postgresql://bharat:bharat@postgres:5432/bharat?schema=public
+      REDIS_URL: redis://redis:6379
+      REGISTRY_URL: http://registry-service:3002
+      ISSUER_SERVICE_URL: http://issuer-service:3001
+      KEYCLOAK_ISSUER_URL: http://localhost:8080/realms/bharat-kyc-dev
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/bharat-kyc-dev/protocol/openid-connect/certs
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      issuer-service:
+        condition: service_started
+      registry-service:
+        condition: service_started
+      keycloak-bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - '3006:3006'
+
+  review-scheduler:
+    container_name: harbinger2.0-review-scheduler
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+    environment:
+      SERVICE_NAME: review-scheduler
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_INCLUDE_BODIES: ${LOG_INCLUDE_BODIES:-0}
+      LOG_HTTP_INCLUDE_HEADERS: ${LOG_HTTP_INCLUDE_HEADERS:-0}
+      LOG_PRETTY_JSON: ${LOG_PRETTY_JSON:-1}
+      LOG_SKIP_HEALTHCHECKS: ${LOG_SKIP_HEALTHCHECKS:-1}
+      LOG_HTTP_SUCCESS_LEVEL: ${LOG_HTTP_SUCCESS_LEVEL:-info}
+      PORT: 3007
+      DATABASE_URL: postgresql://bharat:bharat@postgres:5432/bharat?schema=public
+      REDIS_URL: redis://redis:6379
+      CKYC_ADAPTER_URL: http://ckyc-adapter:3006
+      KEYCLOAK_ISSUER_URL: http://localhost:8080/realms/bharat-kyc-dev
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/bharat-kyc-dev/protocol/openid-connect/certs
+      KEYCLOAK_TOKEN_URL: http://keycloak:8080/realms/bharat-kyc-dev/protocol/openid-connect/token
+      REVIEW_SERVICE_CLIENT_ID: issuer-admin
+      REVIEW_SERVICE_CLIENT_SECRET: ${REVIEW_SERVICE_CLIENT_SECRET:?missing_REVIEW_SERVICE_CLIENT_SECRET}
+      REVIEW_PERIOD_HIGH_YEARS: ${REVIEW_PERIOD_HIGH_YEARS:-2}
+      REVIEW_PERIOD_MEDIUM_YEARS: ${REVIEW_PERIOD_MEDIUM_YEARS:-8}
+      REVIEW_PERIOD_LOW_YEARS: ${REVIEW_PERIOD_LOW_YEARS:-10}
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      ckyc-adapter:
+        condition: service_started
+      keycloak-bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - '3007:3007'
+
+  web-ui:
+    container_name: harbinger2.0-web-ui
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    environment:
+      API_PROXY_ISSUER: http://issuer-service:3001
+      API_PROXY_REGISTRY: http://registry-service:3002
+      API_PROXY_CONSENT: http://consent-manager:3003
+      API_PROXY_WALLET: http://wallet-service:3004
+      API_PROXY_FI: http://fi-service:3005
+      API_PROXY_CKYC: http://ckyc-adapter:3006
+      API_PROXY_REVIEW: http://review-scheduler:3007
+      API_PROXY_KEYCLOAK: http://keycloak:8080
+      VITE_KEYCLOAK_URL: http://localhost:8080
+      VITE_KEYCLOAK_REALM: bharat-kyc-dev
+      VITE_KEYCLOAK_CLIENT_ID: wallet-client
+      VITE_FI_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_FI_BROWSER_CLIENT_ID:-fi-browser-client}
+      VITE_WALLET_OWNER_USERNAME: ${KEYCLOAK_WALLET_OWNER_USER:-wallet-owner-1}
+      VITE_WALLET_OWNER_USER_ID: ${KEYCLOAK_WALLET_OWNER_USER_ID:-KYC-1234}
+      VITE_WALLET_OWNER_ALIAS: ${VITE_WALLET_OWNER_ALIAS:-wallet-owner-1}
+      VITE_WALLET_SECONDARY_USERNAME: ${VITE_WALLET_SECONDARY_USERNAME:-wallet-user-2}
+      VITE_WALLET_SECONDARY_USER_ID: ${VITE_WALLET_SECONDARY_USER_ID:-KYC-5678}
+      VITE_WALLET_SECONDARY_ALIAS: ${VITE_WALLET_SECONDARY_ALIAS:-wallet-user-2}
+      VITE_WALLET_NOMINEE_USERNAME: ${KEYCLOAK_NOMINEE_USER:-wallet-nominee}
+      VITE_WALLET_NOMINEE_ALIAS: ${VITE_WALLET_NOMINEE_ALIAS:-wallet-nominee-1}
+      VITE_FI_USER_1: ${KEYCLOAK_FI_USER_1:-fi-analyst-1}
+      VITE_FI_USER_2: ${KEYCLOAK_FI_USER_2:-fi-analyst-2}
+      VITE_FI_CLIENT_ID: ${KEYCLOAK_FI_CLIENT_ID:-fi-client}
+      VITE_FI2_CLIENT_ID: ${KEYCLOAK_FI2_CLIENT_ID:-fi-client-2}
+      VITE_CONSOLE_DEBUG_LOGS: ${VITE_CONSOLE_DEBUG_LOGS:-1}
+    ports:
+      - '5173:5173'
+    depends_on:
+      issuer-service:
+        condition: service_started
+      registry-service:
+        condition: service_started
+      consent-manager:
+        condition: service_started
+      wallet-service:
+        condition: service_started
+      fi-service:
+        condition: service_started
+      keycloak-bootstrap:
+        condition: service_completed_successfully
