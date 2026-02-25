@@ -1,6 +1,6 @@
 services:
   postgres:
-    container_name: harbinger2.0-postgres
+    container_name: harbinger3.0-postgres
     image: postgres:16
     environment:
       POSTGRES_USER: bharat
@@ -15,13 +15,13 @@ services:
       retries: 10
 
   redis:
-    container_name: harbinger2.0-redis
+    container_name: harbinger3.0-redis
     image: redis:7
     ports:
       - '6379:6379'
 
   keycloak:
-    container_name: harbinger2.0-keycloak
+    container_name: harbinger3.0-keycloak
     image: quay.io/keycloak/keycloak:24.0.1
     command: ['start-dev', '--http-port=8080', '--import-realm']
     environment:
@@ -36,7 +36,7 @@ services:
       - '8080:8080'
 
   keycloak-bootstrap:
-    container_name: harbinger2.0-keycloak-bootstrap
+    container_name: harbinger3.0-keycloak-bootstrap
     image: node:20-alpine
     depends_on:
       keycloak:
@@ -65,7 +65,7 @@ services:
       - ./deploy/keycloak/bootstrap-keycloak.mjs:/opt/keycloak-bootstrap/bootstrap-keycloak.mjs:ro
 
   db-migrate:
-    container_name: harbinger2.0-db-migrate
+    container_name: harbinger3.0-db-migrate
     build:
       context: .
       dockerfile: docker/Dockerfile.service
@@ -83,7 +83,7 @@ services:
     command: ["sh", "-c", "npm run db:push -w packages/db"]
 
   issuer-service:
-    container_name: harbinger2.0-issuer-service
+    container_name: harbinger3.0-issuer-service
     build:
       context: .
       dockerfile: docker/Dockerfile.service
@@ -121,7 +121,7 @@ services:
       - '3001:3001'
 
   registry-service:
-    container_name: harbinger2.0-registry-service
+    container_name: harbinger3.0-registry-service
     build:
       context: .
       dockerfile: docker/Dockerfile.service
@@ -147,7 +147,7 @@ services:
       - '3002:3002'
 
   consent-manager:
-    container_name: harbinger2.0-consent-manager
+    container_name: harbinger3.0-consent-manager
     build:
       context: .
       dockerfile: docker/Dockerfile.service
@@ -191,7 +191,7 @@ services:
       - '3003:3003'
 
   wallet-service:
-    container_name: harbinger2.0-wallet-service
+    container_name: harbinger3.0-wallet-service
     build:
       context: .
       dockerfile: docker/Dockerfile.service
@@ -227,7 +227,7 @@ services:
       - '3004:3004'
 
   fi-service:
-    container_name: harbinger2.0-fi-service
+    container_name: harbinger3.0-fi-service
     build:
       context: .
       dockerfile: docker/Dockerfile.service
@@ -262,7 +262,7 @@ services:
       - '3005:3005'
 
   ckyc-adapter:
-    container_name: harbinger2.0-ckyc-adapter
+    container_name: harbinger3.0-ckyc-adapter
     build:
       context: .
       dockerfile: docker/Dockerfile.service
@@ -296,7 +296,7 @@ services:
       - '3006:3006'
 
   review-scheduler:
-    container_name: harbinger2.0-review-scheduler
+    container_name: harbinger3.0-review-scheduler
     build:
       context: .
       dockerfile: docker/Dockerfile.service
@@ -333,7 +333,7 @@ services:
       - '3007:3007'
 
   web-ui:
-    container_name: harbinger2.0-web-ui
+    container_name: harbinger3.0-web-ui
     build:
       context: .
       dockerfile: docker/Dockerfile.web
