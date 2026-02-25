@@ -24,7 +24,7 @@ export default function CommandLoginPage() {
     if (!deniedRole) {
       return;
     }
-    setStatusMessage(`Access request denied for '${deniedRole}' role on Command Centre.`);
+    setStatusMessage(`Access denied for '${deniedRole}' role on Command Centre.`);
   }, [deniedRole, setStatusMessage]);
 
   const handlePasswordLogin = useCallback(async () => {
@@ -146,7 +146,7 @@ export default function CommandLoginPage() {
         {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900">{formError}</p> : null}
         {deniedRole ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            Access request denied for `{deniedRole}` role on Command Centre. Sign in with an admin-enabled account.
+            Access denied for `{deniedRole}` role on Command Centre. Sign in with an admin-enabled account.
           </p>
         ) : null}
 

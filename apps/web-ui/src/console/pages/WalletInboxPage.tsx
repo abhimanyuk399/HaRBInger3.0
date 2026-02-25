@@ -4,41 +4,34 @@ import { ConsoleCard } from '../components/ConsoleCard';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime, truncate } from '../utils';
-import { mapConsentStatusMeta } from '../statusMeta';
-import { TableFilterBar } from '../components/TableFilterBar';
-import { EmptyStateCard } from '../components/EmptyStateCard';
-import { ConfirmDialog } from '../components/ConfirmDialog';
 
 type Row = Record<string, unknown>;
 
+function statusLabel(status: string) {
+  const normalized = status.toUpperCase();
+  if (normalized === 'PENDING') return { pill: 'warn' as const, label: 'Pending' };
+  if (normalized === 'APPROVED') return { pill: 'ok' as const, label: 'Approved' };
+  if (normalized === 'REJECTED') return { pill: 'error' as const, label: 'Rejected' };
+  if (normalized === 'EXPIRED') return { pill: 'neutral' as const, label: 'Expired' };
+  return { pill: 'neutral' as const, label: status || 'Unknown' };
+}
 
 export default function WalletInboxPage() {
   const { walletConsents, refreshWalletConsents, approveConsent, rejectConsent, activeWalletUsername } = useConsole();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [acting, setActing] = useState<'approve' | 'reject' | null>(null);
   const [approvedFieldMap, setApprovedFieldMap] = useState<Record<string, boolean>>({});
-  const [search, setSearch] = useState('');
-  const [modeFilter, setModeFilter] = useState('ALL');
-  const [confirmAction, setConfirmAction] = useState<'approve' | 'reject' | null>(null);
 
   useEffect(() => {
     void refreshWalletConsents();
   }, [refreshWalletConsents]);
 
   const inbox = useMemo(() => {
-    const query = search.trim().toLowerCase();
     return walletConsents
       .map((c) => c as unknown as Row)
       .filter((c) => String(c.lifecycleStatus ?? c.status ?? '').toUpperCase() === 'PENDING')
-      .filter((c) => {
-        const delegatedMode = String((c.delegatedContext as Row | undefined)?.mode ?? 'SELF').toUpperCase();
-        if (modeFilter !== 'ALL' && delegatedMode !== modeFilter) return false;
-        if (!query) return true;
-        const hay = [c.id, c.consentId, c.fiId, c.purpose, c.subjectUserId].map((v) => String(v ?? '').toLowerCase()).join(' ');
-        return hay.includes(query);
-      })
       .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
-  }, [walletConsents, search, modeFilter]);
+  }, [walletConsents]);
 
   const selected = useMemo(() => {
     const id = selectedId ?? (inbox[0] ? String(inbox[0].id ?? inbox[0].consentId ?? '') : null);
@@ -102,7 +95,6 @@ export default function WalletInboxPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <ConsoleCard>
-          <TableFilterBar search={search} onSearchChange={setSearch} status={modeFilter} onStatusChange={setModeFilter} statuses={['SELF','DELEGATED']} placeholder="Search inbox by FI, purpose, user or consent ID…" />
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-xs text-slate-700">
               <thead className="text-[11px] uppercase tracking-wide text-slate-500">
@@ -118,7 +110,9 @@ export default function WalletInboxPage() {
               <tbody className="divide-y divide-slate-200">
                 {inbox.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-3 py-4"><EmptyStateCard title="No pending consents" description="There are no pending consent requests for the current filter set. Try another mode filter or review Consent History." /></td>
+                    <td colSpan={6} className="px-3 py-4 text-slate-500">
+                      No pending consents.
+                    </td>
                   </tr>
                 ) : (
                   inbox.map((row) => {
@@ -126,7 +120,7 @@ export default function WalletInboxPage() {
                     const delegatedMode = String((row.delegatedContext as Row | undefined)?.mode ?? 'SELF');
                     const subjectUser = String(row.subjectUserId ?? '-');
                     const status = String(row.lifecycleStatus ?? row.status ?? '');
-                    const meta = mapConsentStatusMeta(status);
+                    const meta = statusLabel(status);
                     const active = selectedId === id;
                     return (
                       <tr
@@ -210,10 +204,16 @@ export default function WalletInboxPage() {
                     type="button"
                     disabled={acting !== null}
                     className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-60"
-                    onClick={() => {
+                    onClick={async () => {
                       const consentId = String(selected.id ?? selected.consentId ?? '');
                       if (!consentId) return;
-                      setConfirmAction('approve');
+                      setActing('approve');
+                      try {
+                        await approveConsent(consentId, approvedFieldMap);
+                        await refreshWalletConsents();
+                      } finally {
+                        setActing(null);
+                      }
                     }}
                   >
                     {acting === 'approve' ? 'Approving...' : 'Approve'}
@@ -222,10 +222,16 @@ export default function WalletInboxPage() {
                     type="button"
                     disabled={acting !== null}
                     className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-60"
-                    onClick={() => {
+                    onClick={async () => {
                       const consentId = String(selected.id ?? selected.consentId ?? '');
                       if (!consentId) return;
-                      setConfirmAction('reject');
+                      setActing('reject');
+                      try {
+                        await rejectConsent(consentId, 'Rejected in wallet inbox');
+                        await refreshWalletConsents();
+                      } finally {
+                        setActing(null);
+                      }
                     }}
                   >
                     {acting === 'reject' ? 'Rejecting...' : 'Reject'}
@@ -243,30 +249,6 @@ export default function WalletInboxPage() {
           </div>
         </ConsoleCard>
       </div>
-      <ConfirmDialog
-        open={confirmAction !== null}
-        loading={acting !== null}
-        tone={confirmAction === 'reject' ? 'warn' : 'default'}
-        title={confirmAction === 'approve' ? 'Approve consent request' : 'Reject consent request'}
-        message={confirmAction === 'approve' ? 'Proceed with approval using the selected field-level disclosure preferences?' : 'Proceed with rejecting the selected consent request?'}
-        impactNote={confirmAction === 'approve' ? 'An auditable approval decision will be recorded and the FI will receive access only to the approved fields.' : 'The FI will be notified of the rejection and will need to raise a new request if needed.'}
-        confirmLabel={confirmAction === 'approve' ? 'Approve' : 'Reject'}
-        onCancel={() => setConfirmAction(null)}
-        onConfirm={async () => {
-          if (!selected) return;
-          const consentId = String(selected.id ?? selected.consentId ?? '');
-          if (!consentId) return;
-          setActing(confirmAction);
-          try {
-            if (confirmAction === 'approve') await approveConsent(consentId, approvedFieldMap);
-            else await rejectConsent(consentId, 'Rejected from Wallet Inbox');
-            await refreshWalletConsents();
-          } finally {
-            setActing(null);
-            setConfirmAction(null);
-          }
-        }}
-      />
     </div>
   );
 }

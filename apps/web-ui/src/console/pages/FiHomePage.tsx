@@ -4,7 +4,6 @@ import { useEffect, useMemo } from 'react';
 import { useConsole } from '../ConsoleContext';
 import { displayWalletIdentity } from '../identityConfig';
 import { NotificationList } from '../components/NotificationList';
-import { StatusPill } from '../components/StatusPill';
 
 export default function FiHomePage() {
   const {
@@ -111,7 +110,7 @@ export default function FiHomePage() {
 
   return (
     <div className="space-y-5">
-      <section className="portal-accent-fi rounded-3xl border border-slate-700/70 bg-[linear-gradient(140deg,rgba(15,23,42,0.96),rgba(17,24,61,0.92),rgba(25,25,78,0.95))] p-6 text-white shadow-[0_24px_60px_rgba(2,6,23,0.42)]">
+      <section className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(140deg,rgba(15,23,42,0.96),rgba(17,24,61,0.92),rgba(25,25,78,0.95))] p-6 text-white shadow-[0_24px_60px_rgba(2,6,23,0.42)]">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">FI Overview</p>
@@ -373,21 +372,7 @@ export default function FiHomePage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#111827,#0b1225)] p-5 text-slate-100">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Interoperability & Inclusivity Readiness</p>
-            <p className="mt-1 text-sm text-slate-300">Open API-based token reuse and sector-ready consent orchestration for banking, insurance and mutual funds.</p>
-            <div className="mt-4 space-y-2 text-xs">
-              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>Token coverage across searched users</span><StatusPill status={(fiTokenCoverage?.summary.active ?? 0) > 0 ? 'ok' : 'warn'} label={`${fiTokenCoverage?.summary.active ?? 0} active`} /></div>
-              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>Selective disclosure support</span><StatusPill status={'ok'} label={'Field-level'} /></div>
-              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>Cross-institution reuse</span><StatusPill status={'ok'} label={'Enabled'} /></div>
-              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>No-token user onboarding from FI</span><StatusPill status={'ok'} label={'Available'} /></div>
-            </div>
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] p-3 text-[11px] text-slate-300">
-              <span className="font-semibold text-slate-100">Sector extension:</span> same consent and token verification pattern can be reused for insurance onboarding, mutual fund KYC refresh, and lender journeys.
-            </div>
-          </div>
-
-                    <NotificationList title="Notifications" items={notifications} />
+          <NotificationList title="Notifications" items={notifications} />
 
           <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#0b122b)] p-5 text-slate-100">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Integrity signals</p>

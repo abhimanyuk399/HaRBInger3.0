@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_FI_KEYCLOAK_CLIENT_ID?: string;
   readonly VITE_FI_CLIENT_ID?: string;
   readonly VITE_FI2_CLIENT_ID?: string;
+  readonly VITE_CONSOLE_DEBUG_LOGS?: string;
 }
 
 interface ImportMeta {

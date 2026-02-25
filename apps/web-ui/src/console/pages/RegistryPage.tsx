@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, routeFor } from '../../lib/config';
 import { getWalletAccessToken } from '../../lib/keycloak';
 import { ConsoleCard } from '../components/ConsoleCard';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime, truncate } from '../utils';
-import { computeUserRefHashFromIdentifier } from '@bharat/common';
 
 type TokenRow = {
   tokenId: string;
@@ -19,31 +18,38 @@ type TokenRow = {
   updatedAt: string;
 };
 
+async function computeUserRefHashFromIdentifier(identifier: string): Promise<string> {
+  const normalized = identifier.trim().toLowerCase();
+  if (!normalized) {
+    return '';
+  }
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    return '';
+  }
+  const payload = new TextEncoder().encode(normalized);
+  const digest = await subtle.digest('SHA-256', payload);
+  return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
 export default function RegistryPage() {
   const [rows, setRows] = useState<TokenRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [userIdFilter, setUserIdFilter] = useState('');
-
-  const userRefHash = useMemo(() => {
-    const safe = userIdFilter.trim();
-    if (!safe) return '';
-    try {
-      return computeUserRefHashFromIdentifier(safe);
-    } catch {
-      return '';
-    }
-  }, [userIdFilter]);
+  const [userRefHash, setUserRefHash] = useState('');
 
   async function load() {
     setLoading(true);
     setError(null);
     try {
       const token = await getWalletAccessToken();
+      const normalizedUserId = userIdFilter.trim();
+      const computedUserRefHash = normalizedUserId ? await computeUserRefHashFromIdentifier(normalizedUserId) : '';
       const qs = new URLSearchParams();
       if (statusFilter.trim()) qs.set('status', statusFilter.trim());
-      if (userRefHash) qs.set('userRefHash', userRefHash);
+      if (computedUserRefHash) qs.set('userRefHash', computedUserRefHash);
       qs.set('limit', '200');
 
       const resp = await fetch(routeFor(api.registry, `/v1/registry/tokens?${qs.toString()}`), {
@@ -66,6 +72,31 @@ export default function RegistryPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const normalizedUserId = userIdFilter.trim();
+    if (!normalizedUserId) {
+      setUserRefHash('');
+      return undefined;
+    }
+
+    void computeUserRefHashFromIdentifier(normalizedUserId)
+      .then((value) => {
+        if (!cancelled) {
+          setUserRefHash(value);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUserRefHash('');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userIdFilter]);
 
   return (
     <div className="space-y-4">

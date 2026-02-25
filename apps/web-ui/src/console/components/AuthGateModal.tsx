@@ -65,7 +65,7 @@ export default function AuthGateModal({
         <div className="mt-5">
           <ConsoleButton className="w-full" onClick={onOpenLogin}>
             <LogIn className="h-4 w-4" />
-            Open Secure Sign-In
+            Open Keycloak Login
           </ConsoleButton>
         </div>
 
@@ -76,14 +76,14 @@ export default function AuthGateModal({
               onClick={() => setShowSwitchHelp((previous) => !previous)}
               className="text-sm font-medium text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline"
             >
-              Switch account instructions
+              How to switch users
             </button>
             {showSwitchHelp ? (
               <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                <p>1) Open the secure sign-in page</p>
-                <p>2) Sign out of the current session</p>
-                <p>3) Sign in as {WALLET_NOMINEE_USERNAME}</p>
-                <p>4) Return to the console and continue the workflow</p>
+                <p>1) Open Keycloak</p>
+                <p>2) Logout</p>
+                <p>3) Login as {WALLET_NOMINEE_USERNAME}</p>
+                <p>4) Return to console tab</p>
               </div>
             ) : null}
           </div>
@@ -96,7 +96,7 @@ export default function AuthGateModal({
         </div>
 
         <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          This workflow is paused until authentication is completed. It will resume automatically once the required user session is active.
+          This workflow pauses until wallet login is complete. It resumes automatically after authentication.
         </p>
 
         {onCancel ? (

@@ -95,6 +95,9 @@ const simulateDemoSchema = z
   .optional()
   .default({});
 
+const resetDemoSchema = simulateDemoSchema;
+const simulateDemoAndRunSchema = simulateDemoSchema;
+
 function parseTierYearsEnv(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) {
@@ -964,6 +967,7 @@ app.post(
     const summary = await seedDemoData(actor);
     res.json({ ok: true, summary });
   })
+);
 
 app.post(
   '/v1/demo/reset',
@@ -1018,10 +1022,6 @@ app.post(
     res.json({ ok: true, summary, lifecycle });
   })
 );
-
-
-);
-
 const port = Number(process.env.PORT ?? 3007);
 
 async function start() {

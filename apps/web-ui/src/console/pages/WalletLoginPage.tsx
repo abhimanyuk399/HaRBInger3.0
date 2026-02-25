@@ -31,7 +31,7 @@ export default function WalletLoginPage() {
     if (!deniedRole) {
       return;
     }
-    setStatusMessage(`Access request denied for '${deniedRole}' role on Wallet portal.`);
+    setStatusMessage(`Access denied for '${deniedRole}' role on Wallet portal.`);
   }, [deniedRole, setStatusMessage]);
 
   const handleSignIn = useCallback(async () => {
@@ -154,7 +154,7 @@ export default function WalletLoginPage() {
           ) : null}
           {deniedRole ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              Access request denied for `{deniedRole}` role on Wallet portal. Sign in with a wallet-enabled account.
+              Access denied for `{deniedRole}` role on Wallet portal. Sign in with a wallet-enabled account.
             </p>
           ) : null}
         </div>

@@ -1,13 +1,9 @@
-import { Activity, ArrowRight, Download, RefreshCcw, ServerCog, ShieldCheck, ShieldAlert, Waypoints } from 'lucide-react';
+import { Activity, ArrowRight, RefreshCcw, ServerCog, ShieldCheck, ShieldAlert, Waypoints } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useConsole } from '../ConsoleContext';
 import { displayWalletIdentity } from '../identityConfig';
 import { NotificationList } from '../components/NotificationList';
-import { StatusPill } from '../components/StatusPill';
-import { GuidedWalkthroughPanel } from '../components/GuidedWalkthroughPanel';
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { EmptyStateCard } from '../components/EmptyStateCard';
 
 export default function CommandHomePage() {
   const {
@@ -21,31 +17,12 @@ export default function CommandHomePage() {
     refreshLifecycleJobs,
     runLifecycleNow,
     simulateDemoData,
-    resetDemoData,
-    simulateDemoAndRun,
     runningAction,
-    guided,
-    startGuidedWalkthrough,
-    resumeGuidedWalkthrough,
-    stopGuidedWalkthrough,
   } = useConsole();
 
   useEffect(() => {
     void refreshLifecycleJobs();
   }, [refreshLifecycleJobs]);
-
-  const [guidedPanelOpen, setGuidedPanelOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<null | 'simulate' | 'simulate-run' | 'reset' | 'reset-simulate-run' | 'lifecycle-run'>(null);
-
-  const downloadExport = (name: string, payload: unknown) => {
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   const { totalRequests, failureCount, verifySuccessCount, healthyCount, unhealthyCount } = useMemo(() => {
     const requests = activities.length;
@@ -128,7 +105,7 @@ export default function CommandHomePage() {
 
   return (
     <div className="space-y-5">
-      <section className="portal-accent-command rounded-3xl border border-slate-700/70 bg-[linear-gradient(140deg,rgba(15,23,42,0.96),rgba(14,25,55,0.92),rgba(17,37,84,0.95))] p-6 text-white shadow-[0_24px_60px_rgba(2,6,23,0.42)]">
+      <section className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(140deg,rgba(15,23,42,0.96),rgba(14,25,55,0.92),rgba(17,37,84,0.95))] p-6 text-white shadow-[0_24px_60px_rgba(2,6,23,0.42)]">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">Command Centre</p>
@@ -193,7 +170,7 @@ export default function CommandHomePage() {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setConfirmAction('simulate')}
+                  onClick={() => void simulateDemoData()}
                   disabled={!authenticated || runningAction === 'simulate-demo'}
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200/10 bg-white/[0.06] px-4 py-2 text-xs font-semibold text-slate-100 hover:bg-white/[0.10] disabled:cursor-not-allowed disabled:opacity-60"
                 >
@@ -201,52 +178,6 @@ export default function CommandHomePage() {
                   {runningAction === 'simulate-demo' ? 'Simulating…' : 'Simulate demo data'}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setConfirmAction('simulate-run')}
-                  disabled={runningAction !== null}
-                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-300/20 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Waypoints className="h-4 w-4" />
-                  {runningAction === 'simulate-and-run' ? 'Simulating + running…' : 'Simulate + run lifecycle'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setConfirmAction('reset-simulate-run')}
-                  disabled={runningAction !== null}
-                  className="inline-flex items-center gap-2 rounded-xl border border-blue-300/30 bg-blue-300/10 px-4 py-2 text-xs font-semibold text-blue-100 hover:bg-blue-300/20 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <RefreshCcw className="h-4 w-4" />
-                  Reset + Simulate + Run
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setConfirmAction('reset')}
-                  disabled={runningAction !== null}
-                  className="inline-flex items-center gap-2 rounded-xl border border-rose-300/30 bg-rose-300/10 px-4 py-2 text-xs font-semibold text-rose-100 hover:bg-rose-300/20 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <ShieldAlert className="h-4 w-4" />
-                  {runningAction === 'reset-demo' ? 'Resetting…' : 'Reset demo data'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setGuidedPanelOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-violet-300/30 bg-violet-300/10 px-4 py-2 text-xs font-semibold text-violet-100 hover:bg-violet-300/20"
-                >
-                  <Waypoints className="h-4 w-4" />
-                  Demo Mode
-                </button>
-                <button
-                  type="button"
-                  onClick={() => downloadExport('command-centre-audit-evidence.json', { activities, failures, lifecycleJobs, serviceHealth, verificationResults, exportedAt: new Date().toISOString() })}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200/10 bg-white/[0.06] px-4 py-2 text-xs font-semibold text-slate-100 hover:bg-white/[0.10]"
-                >
-                  <Download className="h-4 w-4" />
-                  Export evidence
-                </button>
 
                 <Link
                   to="/command/operations"
@@ -352,24 +283,7 @@ export default function CommandHomePage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#111827,#0b1225)] p-5 text-slate-100">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">HaRBInger Theme Scorecard</p>
-                <p className="mt-1 text-sm text-slate-300">Identity • Integrity • Inclusivity indicators for judges and demo walkthroughs.</p>
-              </div>
-              <ShieldCheck className="h-5 w-5 text-emerald-300" />
-            </div>
-            <div className="mt-4 space-y-2 text-xs">
-              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>Identity (tokenised KYC + issuer signatures)</span><StatusPill status={verifySuccessCount > 0 ? 'ok' : 'neutral'} label={verifySuccessCount > 0 ? 'Verified flow shown' : 'Ready to demo'} /></div>
-              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>Integrity (audit chain + lifecycle events)</span><StatusPill status={lifecycleJobs.length > 0 ? 'ok' : 'warn'} label={lifecycleJobs.length > 0 ? 'Job evidence present' : 'Run lifecycle'} /></div>
-              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>Inclusivity (delegation / nominee support)</span><StatusPill status={'ok'} label={'Implemented'} /></div>
-              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>Privacy (consent + selective disclosure)</span><StatusPill status={'ok'} label={'Field-level control'} /></div>
-              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>Interoperability (CKYCR / DigiLocker / Aadhaar rails)</span><StatusPill status={'ok'} label={'API stubs + adapters'} /></div>
-            </div>
-          </div>
-
-                    <NotificationList title="Notifications" items={notifications} />
+          <NotificationList title="Notifications" items={notifications} />
 
           <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#0b122b)] p-5 text-slate-100">
             <div className="flex items-center justify-between gap-3">
@@ -388,7 +302,7 @@ export default function CommandHomePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setConfirmAction('lifecycle-run')}
+                  onClick={() => void runLifecycleNow()}
                   className="inline-flex items-center gap-2 rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-300/20"
                 >
                   Run now
@@ -405,7 +319,9 @@ export default function CommandHomePage() {
                 </div>
               ))}
               {(lifecycleJobs ?? []).length === 0 && (
-                <EmptyStateCard title="No lifecycle jobs recorded" description="Run a lifecycle job to demonstrate automated expiry, renewal readiness, and auditable lifecycle housekeeping." />
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-slate-300">
+                  No lifecycle jobs recorded yet.
+                </div>
               )}
             </div>
           </div>
@@ -455,34 +371,6 @@ export default function CommandHomePage() {
           </div>
         </div>
       </section>
-      <GuidedWalkthroughPanel
-        open={guidedPanelOpen}
-        guided={guided}
-        busy={runningAction !== null}
-        onClose={() => { setGuidedPanelOpen(false); stopGuidedWalkthrough(); }}
-        onStart={startGuidedWalkthrough}
-        onResume={resumeGuidedWalkthrough}
-      />
-      <ConfirmDialog
-        open={confirmAction !== null}
-        loading={runningAction !== null}
-        tone={confirmAction === 'reset' || confirmAction === 'reset-simulate-run' ? 'warn' : 'default'}
-        title={confirmAction === 'reset' ? 'Reset demo dataset' : confirmAction === 'reset-simulate-run' ? 'Reset, simulate, and run lifecycle' : confirmAction === 'simulate-run' ? 'Simulate demo data and execute lifecycle' : confirmAction === 'lifecycle-run' ? 'Run lifecycle now' : 'Simulate demo dataset'}
-        message={confirmAction === 'reset' ? 'This will remove demo-scoped data records and restore a clean state.' : confirmAction === 'reset-simulate-run' ? 'This will reset demo data, reseed the dataset, and execute lifecycle jobs in one guided sequence.' : confirmAction === 'simulate-run' ? 'This will seed demo data and run lifecycle processing for immediate dashboard evidence.' : confirmAction === 'lifecycle-run' ? 'Execute lifecycle jobs now to process expiry and housekeeping.' : 'This will seed a realistic demo dataset across Wallet, FI, Registry, and lifecycle views.'}
-        impactNote="Operational actions are auditable and intended for demo/test environments."
-        confirmLabel="Proceed"
-        onCancel={() => setConfirmAction(null)}
-        onConfirm={async () => {
-          const action = confirmAction;
-          if (!action) return;
-          if (action === 'simulate') await simulateDemoData();
-          else if (action === 'simulate-run') await simulateDemoAndRun();
-          else if (action === 'reset') await resetDemoData();
-          else if (action === 'reset-simulate-run') { await resetDemoData(); await simulateDemoAndRun(); }
-          else if (action === 'lifecycle-run') await runLifecycleNow();
-          setConfirmAction(null);
-        }}
-      />
     </div>
   );
 }

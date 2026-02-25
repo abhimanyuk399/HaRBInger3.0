@@ -1,44 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download } from 'lucide-react';
 import { useConsole } from '../ConsoleContext';
 import { ConsoleCard } from '../components/ConsoleCard';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime, truncate } from '../utils';
-import { mapConsentStatusMeta } from '../statusMeta';
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { TableFilterBar } from '../components/TableFilterBar';
-import { EmptyStateCard } from '../components/EmptyStateCard';
 
 type Row = Record<string, unknown>;
 
+function statusLabel(status: string) {
+  const normalized = status.toUpperCase();
+  if (normalized === 'APPROVED') return { pill: 'ok' as const, label: 'Approved' };
+  if (normalized === 'REJECTED') return { pill: 'error' as const, label: 'Rejected' };
+  if (normalized === 'REVOKED') return { pill: 'warn' as const, label: 'Revoked' };
+  if (normalized === 'EXPIRED') return { pill: 'neutral' as const, label: 'Expired' };
+  if (normalized === 'PENDING') return { pill: 'warn' as const, label: 'Pending' };
+  return { pill: 'neutral' as const, label: status || 'Unknown' };
+}
 
 export default function WalletHistoryPage() {
   const { walletConsents, refreshWalletConsents, activeWalletUsername, revokeConsent } = useConsole();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [confirmRevokeOpen, setConfirmRevokeOpen] = useState(false);
-  const [revokeBusy, setRevokeBusy] = useState(false);
 
   useEffect(() => {
     void refreshWalletConsents();
   }, [refreshWalletConsents]);
 
   const history = useMemo(() => {
-    const query = search.trim().toLowerCase();
     return walletConsents
       .map((c) => c as unknown as Row)
       .filter((c) => String(c.lifecycleStatus ?? c.status ?? '').toUpperCase() !== 'PENDING')
-      .filter((c) => {
-        const st = String(c.lifecycleStatus ?? c.status ?? '').toUpperCase();
-        if (statusFilter !== 'ALL' && st !== statusFilter) return false;
-        if (!query) return true;
-        const hay = [c.id, c.consentId, c.fiId, c.purpose, c.subjectUserId, c.actedByUserId].map((v) => String(v ?? '').toLowerCase()).join(' ');
-        return hay.includes(query);
-      })
       .sort((a, b) => String(b.updatedAt ?? b.createdAt ?? '').localeCompare(String(a.updatedAt ?? a.createdAt ?? '')));
-  }, [walletConsents, search, statusFilter]);
+  }, [walletConsents]);
 
   const selected = useMemo(() => {
     const id = selectedId ?? (history[0] ? String(history[0].id ?? history[0].consentId ?? '') : null);
@@ -58,14 +50,6 @@ export default function WalletHistoryPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <ConsoleCard>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <TableFilterBar search={search} onSearchChange={setSearch} status={statusFilter} onStatusChange={setStatusFilter} statuses={['APPROVED','REJECTED','REVOKED','EXPIRED']} placeholder="Search history by FI, purpose, user, consent ID…" />
-            <button
-              type="button"
-              onClick={() => { const blob = new Blob([JSON.stringify(history, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'wallet-consent-history.json'; a.click(); URL.revokeObjectURL(url); }}
-              className="inline-flex items-center gap-2 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-800 hover:bg-indigo-100"
-            ><Download className="h-4 w-4" /> Export JSON</button>
-          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-xs text-slate-700">
               <thead className="text-[11px] uppercase tracking-wide text-slate-500">
@@ -82,14 +66,14 @@ export default function WalletHistoryPage() {
                 {history.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-3 py-4 text-slate-500">
-  
+                      No historical consents.
                     </td>
                   </tr>
                 ) : (
                   history.map((row) => {
                     const id = String(row.id ?? row.consentId ?? '');
                     const status = String(row.lifecycleStatus ?? row.status ?? '');
-                    const meta = mapConsentStatusMeta(status);
+                    const meta = statusLabel(status);
                     const active = selectedId === id;
                     return (
                       <tr
@@ -139,7 +123,10 @@ export default function WalletHistoryPage() {
                     onClick={async () => {
                       const consentId = String(selected.id ?? selected.consentId ?? '');
                       if (!consentId) return;
-                      setConfirmRevokeOpen(true);
+                      const ok = window.confirm('Revoke this approved consent? This will immediately block reuse by FI.');
+                      if (!ok) return;
+                      await revokeConsent(consentId, 'Revoked from Wallet History');
+                      await refreshWalletConsents();
                     }}
                   >
                     Revoke consent
@@ -157,28 +144,6 @@ export default function WalletHistoryPage() {
           </div>
         </ConsoleCard>
       </div>
-      <ConfirmDialog
-        open={confirmRevokeOpen}
-        loading={revokeBusy}
-        tone="warn"
-        title="Revoke approved consent"
-        message="Do you want to revoke the selected approved consent?"
-        impactNote="FI reuse for this approved consent will be blocked immediately and the revocation will be audit-tracked."
-        confirmLabel="Revoke consent"
-        onCancel={() => setConfirmRevokeOpen(false)}
-        onConfirm={async () => {
-          const consentId = selected ? String(selected.id ?? selected.consentId ?? '') : '';
-          if (!consentId) return;
-          setRevokeBusy(true);
-          try {
-            await revokeConsent(consentId, 'Revoked from Wallet History');
-            await refreshWalletConsents();
-          } finally {
-            setRevokeBusy(false);
-            setConfirmRevokeOpen(false);
-          }
-        }}
-      />
     </div>
   );
 }
