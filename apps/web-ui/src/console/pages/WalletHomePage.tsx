@@ -4,6 +4,8 @@ import { useEffect, useMemo } from 'react';
 import { useConsole } from '../ConsoleContext';
 import { displayWalletIdentity } from '../identityConfig';
 import { NotificationList } from '../components/NotificationList';
+import { StatusPill } from '../components/StatusPill';
+import { LoadingListSkeleton } from '../components/LoadingSkeleton';
 
 export default function WalletHomePage() {
   const {
@@ -141,7 +143,7 @@ export default function WalletHomePage() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(140deg,rgba(15,23,42,0.96),rgba(14,22,56,0.92),rgba(17,29,67,0.95))] p-6 text-white shadow-[0_24px_60px_rgba(2,6,23,0.42)]">
+      <section className="portal-accent-wallet rounded-3xl border border-slate-700/70 bg-[linear-gradient(140deg,rgba(15,23,42,0.96),rgba(14,22,56,0.92),rgba(17,29,67,0.95))] p-6 text-white shadow-[0_24px_60px_rgba(2,6,23,0.42)]">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">Wallet Overview</p>
@@ -366,7 +368,29 @@ export default function WalletHomePage() {
             </div>
           </div>
 
-          <NotificationList title="Notifications" items={notifications} />
+          <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#111827,#0b1225)] p-5 text-slate-100">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Identity, Privacy & Interoperability</p>
+                <p className="mt-1 text-sm text-slate-300">HaRBInger-aligned controls for user consent, selective disclosure, delegation and periodic updation.</p>
+              </div>
+              <ShieldCheck className="h-5 w-5 text-cyan-300" />
+            </div>
+            <div className="mt-4 space-y-2 text-xs">
+              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>User-controlled consent sharing</span><StatusPill status={pending > 0 || approved > 0 ? 'ok' : 'neutral'} label={pending > 0 || approved > 0 ? 'Enabled' : 'No activity'} /></div>
+              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>Selective disclosure presets</span><StatusPill status={'ok'} label={'Available'} /></div>
+              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>Delegation for nominee / guardian</span><StatusPill status={activeDelegations > 0 ? 'ok' : 'warn'} label={activeDelegations > 0 ? 'Configured' : 'Optional setup'} /></div>
+              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"><span>Periodic KYC updation workflow</span><StatusPill status={walletReviewStatus?.requiresReconsent === true ? 'warn' : 'ok'} label={walletReviewStatus?.requiresReconsent === true ? 'Action needed' : 'In sync'} /></div>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3 text-[11px]">
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">Aadhaar adapter<br/><span className="text-slate-400">Demo-ready API rail</span></div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">DigiLocker adapter<br/><span className="text-slate-400">Standards stub ready</span></div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">CKYCR sync
+                <br/><span className="text-slate-400">Periodic refresh supported</span></div>
+            </div>
+          </div>
+
+                    <NotificationList title="Notifications" items={notifications} />
 
           <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#0b122b)] p-5 text-slate-100">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">KYC tips (AI-assisted)</p>

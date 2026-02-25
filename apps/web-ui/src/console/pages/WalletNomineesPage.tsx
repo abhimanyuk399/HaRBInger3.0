@@ -5,11 +5,14 @@ import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime } from '../utils';
 import { WALLET_OWNER_USER_ID } from '../identityConfig';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { EmptyStateCard } from '../components/EmptyStateCard';
 
 export default function WalletNomineesPage() {
   const { nominees, refreshNominees, createNominee, setNomineeStatus, addNomineeDelegation, refreshDelegations } = useConsole();
   const [newNominee, setNewNominee] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [confirmNomineeAction, setConfirmNomineeAction] = useState<{ type: 'toggle' | 'delegation'; rowId: string; nomineeUserId: string; active?: boolean } | null>(null);
 
   useEffect(() => {
     void refreshNominees();
@@ -67,9 +70,7 @@ export default function WalletNomineesPage() {
             <tbody className="divide-y divide-slate-200">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-4 text-slate-500">
-                    No nominees.
-                  </td>
+                  <td colSpan={4} className="px-3 py-4"><EmptyStateCard title="No nominees configured" description="Add a nominee to support delegation for guardians/legal heirs and inclusive access flows." /></td>
                 </tr>
               ) : (
                 rows.map((row) => {
@@ -87,7 +88,7 @@ export default function WalletNomineesPage() {
                             type="button"
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
                             onClick={async () => {
-                              await setNomineeStatus(WALLET_OWNER_USER_ID, row.id, active ? 'disable' : 'enable');
+                              setConfirmNomineeAction({ type: 'toggle', rowId: row.id, nomineeUserId: row.nomineeUserId, active });
                             }}
                           >
                             {active ? 'Disable' : 'Enable'}
@@ -97,12 +98,7 @@ export default function WalletNomineesPage() {
                             disabled={!active}
                             className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-[11px] font-semibold text-indigo-800 hover:bg-indigo-100 disabled:opacity-60"
                             onClick={async () => {
-                              // Create delegation directly from nominee list
-                              await addNomineeDelegation({
-                                ownerUserId: WALLET_OWNER_USER_ID,
-                                delegateUserId: row.nomineeUserId,
-                              });
-                              await refreshDelegations(WALLET_OWNER_USER_ID);
+                              setConfirmNomineeAction({ type: 'delegation', rowId: row.id, nomineeUserId: row.nomineeUserId });
                             }}
                           >
                             Create delegation
@@ -117,6 +113,26 @@ export default function WalletNomineesPage() {
           </table>
         </div>
       </ConsoleCard>
+      <ConfirmDialog
+        open={Boolean(confirmNomineeAction)}
+        tone={confirmNomineeAction?.type === 'toggle' && confirmNomineeAction?.active ? 'warn' : 'default'}
+        title={confirmNomineeAction?.type === 'delegation' ? 'Create delegation from nominee' : confirmNomineeAction?.active ? 'Disable nominee' : 'Enable nominee'}
+        message={confirmNomineeAction?.type === 'delegation' ? `Create a delegation authority for nominee ${confirmNomineeAction?.nomineeUserId}?` : confirmNomineeAction?.active ? `Disable nominee ${confirmNomineeAction?.nomineeUserId}?` : `Enable nominee ${confirmNomineeAction?.nomineeUserId}?`}
+        impactNote={confirmNomineeAction?.type === 'delegation' ? 'A delegation record will be created with auditable controls and can be disabled later from the Delegations page.' : 'Nominee status changes affect delegation eligibility and delegated consent flows.'}
+        confirmLabel={confirmNomineeAction?.type === 'delegation' ? 'Create delegation' : confirmNomineeAction?.active ? 'Disable nominee' : 'Enable nominee'}
+        onCancel={() => setConfirmNomineeAction(null)}
+        onConfirm={async () => {
+          if (!confirmNomineeAction) return;
+          if (confirmNomineeAction.type === 'delegation') {
+            await addNomineeDelegation({ ownerUserId: WALLET_OWNER_USER_ID, delegateUserId: confirmNomineeAction.nomineeUserId });
+            await refreshDelegations(WALLET_OWNER_USER_ID);
+          } else {
+            await setNomineeStatus(WALLET_OWNER_USER_ID, confirmNomineeAction.rowId, confirmNomineeAction.active ? 'disable' : 'enable');
+            await refreshNominees(WALLET_OWNER_USER_ID);
+          }
+          setConfirmNomineeAction(null);
+        }}
+      />
     </div>
   );
 }

@@ -360,6 +360,8 @@ interface ConsoleContextValue {
   refreshLifecycleJobs: () => Promise<void>;
   runLifecycleNow: () => Promise<void>;
   simulateDemoData: () => Promise<void>;
+  resetDemoData: () => Promise<void>;
+  simulateDemoAndRun: () => Promise<void>;
   refreshRegistryEvidence: (targetTokenId?: string) => Promise<void>;
   refreshServiceHealth: () => Promise<void>;
   startGuidedWalkthrough: () => Promise<void>;
@@ -408,6 +410,119 @@ function buildKycIdentityForUser(userId: string): IssueKycPayload {
 
 const DEFAULT_WALLET_OWNER = WALLET_OWNER_USERNAME;
 const DEFAULT_WALLET_NOMINEE = WALLET_NOMINEE_USERNAME;
+
+function toEnterpriseUiMessage(message: string) {
+  const normalized = message.trim();
+  if (!normalized) {
+    return normalized;
+  }
+
+  const replacements: Array<[RegExp, string]> = [
+    [/^Login required for wallet actions\.?$/i, 'Authentication required for wallet operations. Please sign in to continue.'],
+    [/^Failed simulate\+run\.?$/i, 'Demo simulation and lifecycle execution could not be completed.'],
+    [/^Demo simulated and lifecycle run completed\.?$/i, 'Demo dataset seeded and lifecycle processing completed successfully.'],
+    [/^Demo data reset\.?$/i, 'Demo dataset reset completed successfully.'],
+    [/^Failed to reset demo data\.?$/i, 'Demo dataset reset could not be completed.'],
+    [/^Demo dataset created\. Dashboards refreshed\.?$/i, 'Demo dataset created successfully. Portal dashboards have been refreshed.'],
+    [/^Nominee saved\.?$/i, 'Nominee record created successfully.'],
+    [/^Nominee updated\.?$/i, 'Nominee status updated successfully.'],
+    [/^Delegation revoked\.?$/i, 'Delegation access has been disabled successfully.'],
+    [/^Review status loaded\.?$/i, 'Periodic KYC review status loaded successfully.'],
+    [/^No periodic review profile yet\.?$/i, 'No periodic KYC review profile is available for this user yet.'],
+    [/^Periodic re-consent request created\. Check Consent Inbox\.?$/i, 'Periodic KYC re-consent request created successfully. Please review it in the Consent Inbox.'],
+    [/^Service health refreshed\.?$/i, 'Service health status refreshed successfully.'],
+    [/^Guided walkthrough completed\.?$/i, 'Guided walkthrough completed successfully.'],
+    [/^Guided walkthrough stopped\.?$/i, 'Guided walkthrough has been stopped.'],
+    [/^Coverage checklist reset\.?$/i, 'Coverage checklist has been reset.'],
+    [/^Wallet session signed out\.?$/i, 'Wallet session signed out successfully.'],
+    [/^FI session signed out\.?$/i, 'FI session signed out successfully.'],
+  ];
+
+  for (const [pattern, replacement] of replacements) {
+    if (pattern.test(normalized)) {
+      return replacement;
+    }
+  }
+
+  let updated = normalized
+    .replace(/^Loading /, 'Loading ')
+    .replace(/^Refreshing /, 'Refreshing ')
+    .replace(/^Running /, 'Running ')
+    .replace(/^Requesting /, 'Submitting ')
+    .replace(/^Adding nominee delegation\.{0,3}$/i, 'Creating delegation from nominee record...')
+    .replace(/^Creating nominee\.{0,3}$/i, 'Creating nominee record...')
+    .replace(/^Revoking delegation\.{0,3}$/i, 'Disabling delegation access...')
+    .replace(/^Revoking consent\.{0,3}$/i, 'Revoking consent authorization...')
+    .replace(/^Revoking token\.{0,3}$/i, 'Revoking KYC token...')
+    .replace(/^Renewing wallet token\.{0,3}$/i, 'Renewing wallet KYC token...')
+    .replace(/^Onboarding user from FI portal\.{0,3}$/i, 'Initiating FI-assisted user onboarding...');
+
+  if (/^Wallet tokens loaded: \d+$/i.test(updated)) {
+    updated = updated.replace(/^Wallet tokens loaded: (\d+)$/i, 'Wallet token records loaded successfully ($1).');
+  } else if (/^Wallet consents loaded: \d+$/i.test(updated)) {
+    updated = updated.replace(/^Wallet consents loaded: (\d+)$/i, 'Wallet consent records loaded successfully ($1).');
+  } else if (/^Delegations loaded: \d+$/i.test(updated)) {
+    updated = updated.replace(/^Delegations loaded: (\d+)$/i, 'Delegation records loaded successfully ($1).');
+  } else if (/^Nominees loaded: \d+$/i.test(updated)) {
+    updated = updated.replace(/^Nominees loaded: (\d+)$/i, 'Nominee records loaded successfully ($1).');
+  } else if (/^Lifecycle jobs loaded: /i.test(updated)) {
+    updated = updated.replace(/^Lifecycle jobs loaded: (.+)$/i, 'Lifecycle job history loaded successfully ($1).');
+  }
+
+  return updated;
+}
+
+
+type UiPortalContext = 'wallet' | 'fi' | 'command' | 'auth' | 'shared';
+
+function detectUiPortalContext(): UiPortalContext {
+  if (typeof window === 'undefined') return 'shared';
+  const path = window.location.pathname.toLowerCase();
+  if (path.startsWith('/wallet')) return path.includes('/login') ? 'auth' : 'wallet';
+  if (path.startsWith('/fi')) return path.includes('/login') ? 'auth' : 'fi';
+  if (path.startsWith('/command')) return path.includes('/login') ? 'auth' : 'command';
+  if (path === '/login') return 'auth';
+  return 'shared';
+}
+
+function enrichUiMessageForPortal(message: string, portal: UiPortalContext, tone: FlashMessage['tone']) {
+  const normalized = message.trim();
+  if (!normalized) return normalized;
+
+  const shouldPrefix = tone !== 'error' && !/^Authentication required/i.test(normalized);
+  if (!shouldPrefix) return normalized;
+
+  if (portal === 'wallet') return `Wallet Portal: ${normalized}`;
+  if (portal === 'fi') return `FI Portal: ${normalized}`;
+  if (portal === 'command') return `Command Centre: ${normalized}`;
+  if (portal === 'auth') return `Sign-in: ${normalized}`;
+  return normalized;
+}
+
+function deriveUiErrorCode(message: string, detail?: string, portal: UiPortalContext = 'shared') {
+  const corpus = `${message} ${detail ?? ''}`.toLowerCase();
+  const domain = portal === 'wallet' ? 'WAL' : portal === 'fi' ? 'FI' : portal === 'command' ? 'CMD' : portal === 'auth' ? 'AUTH' : 'GEN';
+  if (corpus.includes('authentication required') || corpus.includes('login') || corpus.includes('unauthorized')) return `UI-${domain}-AUTH-001`;
+  if (corpus.includes('forbidden') || corpus.includes('denied')) return `UI-${domain}-AUTHZ-001`;
+  if (corpus.includes('network') || corpus.includes('fetch')) return `UI-${domain}-NET-001`;
+  if (corpus.includes('timeout') || corpus.includes('timed out')) return `UI-${domain}-TIMEOUT-001`;
+  if (corpus.includes('simulate')) return `UI-${domain}-DEMO-001`;
+  if (corpus.includes('lifecycle')) return `UI-${domain}-LIFE-001`;
+  if (corpus.includes('consent')) return `UI-${domain}-CONSENT-001`;
+  if (corpus.includes('token')) return `UI-${domain}-TOKEN-001`;
+  if (corpus.includes('nominee')) return `UI-${domain}-NOMINEE-001`;
+  if (corpus.includes('delegation')) return `UI-${domain}-DELEGATION-001`;
+  return `UI-${domain}-GEN-001`;
+}
+
+function formatEnterpriseFlashDetail(tone: FlashMessage['tone'], detail: string | undefined, portal: UiPortalContext, message: string) {
+  const cleaned = typeof detail === 'string' ? detail.trim() : '';
+  if (tone !== 'error') return cleaned || undefined;
+  const code = deriveUiErrorCode(message, cleaned, portal);
+  if (!cleaned) return `Reference code: ${code}`;
+  if (/reference code:/i.test(cleaned) || cleaned.includes(code)) return cleaned;
+  return `Reference code: ${code} · ${cleaned}`;
+}
 
 function classifyStatusMessageTone(message: string): FlashMessage['tone'] | null {
   const normalized = message.trim();
@@ -1014,15 +1129,18 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const pushFlashMessage = useCallback((tone: FlashMessage['tone'], message: string, detail?: string) => {
-    const normalized = message.trim();
+    const portal = detectUiPortalContext();
+    const enterpriseMessage = toEnterpriseUiMessage(message).trim();
+    const normalized = enrichUiMessageForPortal(enterpriseMessage, portal, tone).trim();
     if (!normalized) {
       return;
     }
+    const formattedDetail = formatEnterpriseFlashDetail(tone, detail, portal, normalized);
     const created: FlashMessage = {
       id: createId(),
       tone,
       message: normalized,
-      ...(typeof detail === 'string' && detail.trim().length > 0 ? { detail: detail.trim() } : {}),
+      ...(formattedDetail ? { detail: formattedDetail } : {}),
     };
     setFlashMessages((previous) => [created, ...previous].slice(0, 5));
   }, []);
@@ -3275,6 +3393,53 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
     setStatusMessage('Coverage checklist reset.');
   }, []);
 
+const resetDemoData = useCallback(async () => {
+    setRunningAction('reset-demo');
+    setStatusMessage('Resetting demo data...');
+    try {
+      await apiCall<{ ok: boolean; message?: string }>({
+        service: 'review',
+        title: 'Reset Demo Dataset',
+        method: 'POST',
+        path: routeFor(api.review, '/v1/demo/reset'),
+        body: { actor: activeWalletUsername ? `command-${activeWalletUsername}` : 'command-ui' },
+      });
+      pushActivity({ service: 'review', label: 'DEMO_RESET', status: 'success', detail: 'demo dataset cleared' });
+      setStatusMessage('Demo dataset reset completed successfully.');
+      // Refresh dashboards
+      await refreshLifecycleJobs();
+      await refreshServiceHealth();
+    } catch (e) {
+      pushActivity({ service: 'review', label: 'DEMO_RESET', status: 'error', detail: String(e) });
+      setStatusMessage('Demo dataset reset could not be completed.');
+    } finally {
+      setRunningAction(null);
+    }
+  }, [activeWalletUsername, apiCall, pushActivity, refreshLifecycleJobs, refreshServiceHealth]);
+
+  const simulateDemoAndRun = useCallback(async () => {
+    setRunningAction('simulate-and-run');
+    setStatusMessage('Simulating demo data and running lifecycle jobs...');
+    try {
+      await apiCall<{ ok: boolean }>({
+        service: 'review',
+        title: 'Simulate + Run Lifecycle',
+        method: 'POST',
+        path: routeFor(api.review, '/v1/demo/simulate-and-run'),
+        body: { actor: activeWalletUsername ? `command-${activeWalletUsername}` : 'command-ui' },
+      });
+      pushActivity({ service: 'review', label: 'DEMO_SIMULATE_AND_RUN', status: 'success', detail: 'seeded + lifecycle run' });
+      setStatusMessage('Demo dataset seeded and lifecycle processing completed successfully.');
+      await refreshLifecycleJobs();
+      await refreshServiceHealth();
+    } catch (e) {
+      pushActivity({ service: 'review', label: 'DEMO_SIMULATE_AND_RUN', status: 'error', detail: String(e) });
+      setStatusMessage('Demo simulation and lifecycle execution could not be completed.');
+    } finally {
+      setRunningAction(null);
+    }
+  }, [activeWalletUsername, apiCall, pushActivity, refreshLifecycleJobs, refreshServiceHealth]);
+
   const contextValue = useMemo<ConsoleContextValue>(
     () => ({
       scenarioId,
@@ -3363,7 +3528,9 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
       lifecycleJobs,
       refreshLifecycleJobs,
       runLifecycleNow,
+      resetDemoData,
       simulateDemoData,
+      simulateDemoAndRun,
       refreshRegistryEvidence,
       refreshServiceHealth,
       startGuidedWalkthrough,
@@ -3437,7 +3604,9 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
       lifecycleJobs,
       refreshLifecycleJobs,
       runLifecycleNow,
+      resetDemoData,
       simulateDemoData,
+      simulateDemoAndRun,
       roleClaims,
       runningAction,
       scenario,
@@ -3474,51 +3643,3 @@ export function useConsole() {
 export function decodeJwtPayload(token: string | null) {
   return parseJwtPayload(token);
 }
-  const resetDemoData = useCallback(async () => {
-    setRunningAction('reset-demo');
-    setStatusMessage('Resetting demo data...');
-    try {
-      await apiCall<{ ok: boolean; message?: string }>({
-        service: 'review',
-        title: 'Reset Demo Dataset',
-        method: 'POST',
-        path: routeFor(api.review, '/v1/demo/reset'),
-        body: { actor: activeWalletUsername ? `command-${activeWalletUsername}` : 'command-ui' },
-      });
-      pushActivity({ service: 'review', label: 'DEMO_RESET', status: 'success', detail: 'demo dataset cleared' });
-      setStatusMessage('Demo data reset.');
-      // Refresh dashboards
-      await refreshLifecycleJobs();
-      await refreshServiceHealth();
-    } catch (e) {
-      pushActivity({ service: 'review', label: 'DEMO_RESET', status: 'error', detail: String(e) });
-      setStatusMessage('Failed to reset demo data.');
-    } finally {
-      setRunningAction(null);
-    }
-  }, [activeWalletUsername, apiCall, pushActivity, refreshLifecycleJobs, refreshServiceHealth]);
-
-  const simulateDemoAndRun = useCallback(async () => {
-    setRunningAction('simulate-and-run');
-    setStatusMessage('Simulating demo data and running lifecycle jobs...');
-    try {
-      await apiCall<{ ok: boolean }>({
-        service: 'review',
-        title: 'Simulate + Run Lifecycle',
-        method: 'POST',
-        path: routeFor(api.review, '/v1/demo/simulate-and-run'),
-        body: { actor: activeWalletUsername ? `command-${activeWalletUsername}` : 'command-ui' },
-      });
-      pushActivity({ service: 'review', label: 'DEMO_SIMULATE_AND_RUN', status: 'success', detail: 'seeded + lifecycle run' });
-      setStatusMessage('Demo simulated and lifecycle run completed.');
-      await refreshLifecycleJobs();
-      await refreshServiceHealth();
-    } catch (e) {
-      pushActivity({ service: 'review', label: 'DEMO_SIMULATE_AND_RUN', status: 'error', detail: String(e) });
-      setStatusMessage('Failed simulate+run.');
-    } finally {
-      setRunningAction(null);
-    }
-  }, [activeWalletUsername, apiCall, pushActivity, refreshLifecycleJobs, refreshServiceHealth]);
-
-

@@ -31,7 +31,7 @@ export default function FiLoginPage() {
     if (!deniedRole) {
       return;
     }
-    setStatusMessage(`Access denied for '${deniedRole}' role on FI portal.`);
+    setStatusMessage(`Access request denied for '${deniedRole}' role on FI portal.`);
   }, [deniedRole, setStatusMessage]);
 
   const handleSignIn = useCallback(async () => {
@@ -150,7 +150,7 @@ export default function FiLoginPage() {
         ) : null}
         {deniedRole ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            Access denied for `{deniedRole}` role on FI portal. Sign in with an FI-enabled account.
+            Access request denied for `{deniedRole}` role on FI portal. Sign in with an FI-enabled account.
           </p>
         ) : null}
 

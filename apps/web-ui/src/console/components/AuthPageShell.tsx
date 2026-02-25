@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useConsole } from '../ConsoleContext';
 import { FlashStack } from './FlashStack';
+import { ThemeToggle } from './ThemeToggle';
+import { useTheme } from '../../theme/ThemeProvider';
 
 interface AuthPageShellProps {
   portalLabel: string;
@@ -140,11 +142,13 @@ export function AuthPageShell({
 }: AuthPageShellProps) {
   const visual = visualTheme[visualVariant];
   const { flashMessages, dismissFlashMessage } = useConsole();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_55%),radial-gradient(circle_at_bottom,rgba(16,185,129,0.16),transparent_52%),linear-gradient(135deg,#020617,#0b1025,#0f1b44)] p-2 sm:p-4">
+    <div className={isDark ? "min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_55%),radial-gradient(circle_at_bottom,rgba(16,185,129,0.16),transparent_52%),linear-gradient(135deg,#020617,#0b1025,#0f1b44)] p-2 sm:p-4" : "min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.10),transparent_55%),radial-gradient(circle_at_bottom,rgba(16,185,129,0.08),transparent_52%),linear-gradient(135deg,#f8fbff,#f1f5f9,#ffffff)] p-2 sm:p-4"}>
       <FlashStack messages={flashMessages} onDismiss={dismissFlashMessage} />
-      <div className="mx-auto min-h-[calc(100vh-1rem)] w-full max-w-[1720px] overflow-hidden rounded-[26px] border border-white/10 bg-white/5 shadow-[0_30px_72px_rgba(2,6,23,0.55)] backdrop-blur sm:rounded-[34px] lg:h-[calc(100vh-2rem)] lg:max-h-[980px] lg:min-h-0">
+      <div className={`${isDark ? 'mx-auto min-h-[calc(100vh-1rem)] w-full max-w-[1720px] overflow-hidden rounded-[26px] border border-white/10 bg-white/5 shadow-[0_30px_72px_rgba(2,6,23,0.55)] backdrop-blur' : 'mx-auto min-h-[calc(100vh-1rem)] w-full max-w-[1720px] overflow-hidden rounded-[26px] border border-slate-200/80 bg-white/90 shadow-[0_24px_48px_rgba(15,23,42,0.08)] backdrop-blur'} sm:rounded-[34px] lg:h-[calc(100vh-2rem)] lg:max-h-[980px] lg:min-h-0`}>
         <div className="grid h-full lg:grid-cols-[minmax(520px,1fr)_minmax(500px,1fr)]">
           <section className={`relative hidden overflow-hidden ${visual.panelBg} lg:block`}>
             <div className={`pointer-events-none absolute -left-20 top-10 h-72 w-72 rounded-full blur-3xl ${visual.glowA}`} />
@@ -174,20 +178,21 @@ export function AuthPageShell({
             </div>
           </section>
 
-          <section className="relative overflow-y-visible bg-white px-4 py-5 sm:px-8 sm:py-7 lg:overflow-y-auto lg:px-14 lg:py-9">
+          <section className={isDark ? "relative overflow-y-visible bg-slate-950/30 px-4 py-5 sm:px-8 sm:py-7 lg:overflow-y-auto lg:px-14 lg:py-9" : "relative overflow-y-visible bg-white px-4 py-5 sm:px-8 sm:py-7 lg:overflow-y-auto lg:px-14 lg:py-9"}>
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-700">
+                <span className={isDark ? "inline-flex items-center rounded-full border border-indigo-400/30 bg-indigo-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-200" : "inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-700"}>
                   {portalLabel}
                 </span>
                 <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold ${toneClass[badgeTone]}`}>
                   Secure authentication
                 </span>
                 <div className="ml-auto hidden flex-wrap items-center gap-2 text-xs sm:flex">
+                  <ThemeToggle compact />
                   {portalLinks.map((item) => (
                     <Link
                       key={item.path}
-                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                      className={isDark ? "rounded-lg border border-slate-700 bg-slate-900/70 px-2.5 py-1.5 font-semibold text-slate-100 hover:border-slate-600 hover:bg-slate-800" : "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"}
                       to={item.path}
                     >
                       {item.label}
@@ -195,23 +200,23 @@ export function AuthPageShell({
                   ))}
                 </div>
               </div>
-              <h1 className="text-[1.72rem] font-semibold leading-[1.08] tracking-[-0.02em] text-slate-950 sm:text-[2.05rem] lg:text-[2.45rem]">
+              <h1 className={isDark ? "text-[1.72rem] font-semibold leading-[1.08] tracking-[-0.02em] text-slate-50 sm:text-[2.05rem] lg:text-[2.45rem]" : "text-[1.72rem] font-semibold leading-[1.08] tracking-[-0.02em] text-slate-950 sm:text-[2.05rem] lg:text-[2.45rem]"}>
                 {title}
               </h1>
-              <p className="max-w-2xl text-sm text-slate-600 sm:text-base">{subtitle}</p>
+              <p className={isDark ? "max-w-2xl text-sm text-slate-300 sm:text-base" : "max-w-2xl text-sm text-slate-600 sm:text-base"}>{subtitle}</p>
             </div>
 
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.08)] sm:mt-7 sm:rounded-3xl sm:p-5">
+            <div className={isDark ? "mt-6 rounded-2xl border border-slate-700 bg-slate-900/70 p-4 shadow-[0_14px_34px_rgba(2,6,23,0.35)] sm:mt-7 sm:rounded-3xl sm:p-5" : "mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.08)] sm:mt-7 sm:rounded-3xl sm:p-5"}>
               {children}
             </div>
 
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:hidden">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-700">Portal Routes</p>
+            <div className={isDark ? "mt-6 rounded-2xl border border-slate-700 bg-slate-900/60 p-4 sm:hidden" : "mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:hidden"}>
+              <p className={isDark ? "text-xs font-semibold uppercase tracking-[0.14em] text-slate-200" : "text-xs font-semibold uppercase tracking-[0.14em] text-slate-700"}>Portal Routes</p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs">
                 {portalLinks.map((item) => (
                   <Link
                     key={item.path}
-                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                    className={isDark ? "rounded-lg border border-slate-700 bg-slate-900/70 px-2.5 py-1.5 font-semibold text-slate-100 hover:border-slate-600 hover:bg-slate-800" : "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"}
                     to={item.path}
                   >
                     {item.label}
@@ -220,15 +225,15 @@ export function AuthPageShell({
               </div>
             </div>
 
-            <p className="mt-6 text-center text-xs text-white/55 lg:mt-8">
+            <p className={isDark ? "mt-6 text-center text-xs text-white/55 lg:mt-8" : "mt-6 text-center text-xs text-slate-500 lg:mt-8"}>
               Bharat KYC T • Tokenised KYC demo • Consent-driven, auditable identity sharing
             </p>
 
             {highlights.length > 0 ? (
               <ul className="mt-5 space-y-2">
                 {highlights.map((highlight) => (
-                  <li key={highlight} className="flex items-start gap-2 text-sm text-slate-600">
-                    <span className="mt-1 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full border border-indigo-300 bg-indigo-50 text-[10px] font-semibold text-indigo-600">
+                  <li key={highlight} className={isDark ? "flex items-start gap-2 text-sm text-slate-300" : "flex items-start gap-2 text-sm text-slate-600"}>
+                    <span className={isDark ? "mt-1 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full border border-indigo-400/30 bg-indigo-400/10 text-[10px] font-semibold text-indigo-200" : "mt-1 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full border border-indigo-300 bg-indigo-50 text-[10px] font-semibold text-indigo-600"}>
                       {'>'}
                     </span>
                     <span>{highlight}</span>

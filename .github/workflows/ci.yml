@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint, Test, Docker, Helm
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      DOCKER_BUILDKIT: "1"
+      COMPOSE_DOCKER_CLI_BUILD: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps (npm workspaces)
+        run: npm ci --no-audit --no-fund
+
+      - name: Prisma generate (workspace)
+        run: npm -w packages/db run db:generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      # Generate .env BEFORE any docker compose command
+      - name: Prepare docker compose .env
+        run: node scripts/ci/generate-compose-env.mjs
+
+      - name: Build docker images
+        run: docker compose build
+
+      - name: Start docker compose stack
+        run: |
+          docker compose up -d \
+            postgres redis keycloak keycloak-bootstrap db-migrate \
+            issuer-service registry-service consent-manager wallet-service \
+            fi-service ckyc-adapter review-scheduler web-ui
+
+      - name: Wait for stack readiness (smoke)
+        run: |
+          bash scripts/ci/wait-for-http.sh "http://localhost:8080/realms/bharat-kyc-dev/.well-known/openid-configuration"
+          bash scripts/ci/wait-for-http.sh "http://localhost:3001/v1/health?probe=readiness"
+          bash scripts/ci/wait-for-http.sh "http://localhost:3002/v1/health?probe=readiness"
+          bash scripts/ci/wait-for-http.sh "http://localhost:3003/v1/health?probe=readiness"
+          bash scripts/ci/wait-for-http.sh "http://localhost:3004/v1/health?probe=readiness"
+          bash scripts/ci/wait-for-http.sh "http://localhost:3005/v1/health?probe=readiness"
+          bash scripts/ci/wait-for-http.sh "http://localhost:3006/v1/health?probe=readiness"
+          bash scripts/ci/wait-for-http.sh "http://localhost:3007/v1/health?probe=readiness"
+          bash scripts/ci/wait-for-http.sh "http://localhost:5173/demo"
+          bash scripts/ci/wait-for-http.sh "http://localhost:5173/console"
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.15.4
+
+      - name: Helm template validation
+        run: |
+          helm lint deploy/helm/bharat-kyc-t -f deploy/helm/bharat-kyc-t/values-local.yaml
+          helm template bharat-kyc-t deploy/helm/bharat-kyc-t -f deploy/helm/bharat-kyc-t/values-local.yaml >/tmp/local-render.yaml
+          helm template bharat-kyc-t deploy/helm/bharat-kyc-t -f deploy/helm/bharat-kyc-t/values-gke.yaml >/tmp/gke-render.yaml
+
+      - name: Docker compose logs on failure
+        if: failure()
+        run: |
+          test -f .env && docker compose logs --no-color || true
+
+      - name: Shutdown docker compose
+        if: always()
+        run: |
+          test -f .env && docker compose down -v --remove-orphans || true

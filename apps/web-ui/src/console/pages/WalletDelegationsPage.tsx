@@ -5,10 +5,13 @@ import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime, truncate } from '../utils';
 import { WALLET_OWNER_USER_ID } from '../identityConfig';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { EmptyStateCard } from '../components/EmptyStateCard';
 
 export default function WalletDelegationsPage() {
   const { delegations, refreshDelegations, revokeDelegation, nominees, refreshNominees } = useConsole();
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [confirmDelegationId, setConfirmDelegationId] = useState<string | null>(null);
 
   useEffect(() => {
     void Promise.allSettled([refreshDelegations(WALLET_OWNER_USER_ID), refreshNominees(WALLET_OWNER_USER_ID)]);
@@ -43,9 +46,7 @@ export default function WalletDelegationsPage() {
             <tbody className="divide-y divide-slate-200">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-4 text-slate-500">
-                    No delegations.
-                  </td>
+                  <td colSpan={6} className="px-3 py-4"><EmptyStateCard title="No delegations configured" description="Create a nominee first and create a delegation from the nominee list to support delegated approvals." /></td>
                 </tr>
               ) : (
                 rows.map((row) => {
@@ -71,13 +72,7 @@ export default function WalletDelegationsPage() {
                           disabled={!active || revoking === row.id}
                           className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-[11px] font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-60"
                           onClick={async () => {
-                            setRevoking(row.id);
-                            try {
-                              await revokeDelegation(row.id);
-                              await refreshDelegations(WALLET_OWNER_USER_ID);
-                            } finally {
-                              setRevoking(null);
-                            }
+                            setConfirmDelegationId(row.id);
                           }}
                         >
                           {revoking === row.id ? 'Revoking...' : 'Disable'}
@@ -97,6 +92,27 @@ export default function WalletDelegationsPage() {
           </table>
         </div>
       </ConsoleCard>
+      <ConfirmDialog
+        open={Boolean(confirmDelegationId)}
+        loading={Boolean(revoking)}
+        tone="warn"
+        title="Disable delegation"
+        message="Do you want to disable this delegation authority?"
+        impactNote="The delegate will no longer be able to approve/reject consent requests on behalf of the owner until re-enabled."
+        confirmLabel="Disable delegation"
+        onCancel={() => setConfirmDelegationId(null)}
+        onConfirm={async () => {
+          if (!confirmDelegationId) return;
+          setRevoking(confirmDelegationId);
+          try {
+            await revokeDelegation(confirmDelegationId);
+            await refreshDelegations(WALLET_OWNER_USER_ID);
+          } finally {
+            setRevoking(null);
+            setConfirmDelegationId(null);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
 import { initAuthClientsForCurrentRoute } from './lib/keycloak';
+import { ThemeProvider } from './theme/ThemeProvider';
 
 function clearLoginRequiredHash() {
   if (typeof window === 'undefined') {
@@ -33,9 +34,11 @@ async function bootstrap() {
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </ThemeProvider>
     </React.StrictMode>
   );
 }

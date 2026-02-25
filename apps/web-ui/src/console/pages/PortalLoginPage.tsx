@@ -80,7 +80,7 @@ export default function PortalLoginPage() {
     if (!deniedRole) {
       return;
     }
-    setStatusMessage(`Access denied for '${deniedRole}' role.`);
+    setStatusMessage(`Access request denied for '${deniedRole}' role.`);
   }, [deniedRole, setStatusMessage]);
 
   const handleSignIn = async () => {
@@ -167,7 +167,7 @@ export default function PortalLoginPage() {
 
         {deniedRole ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            Access denied for `{deniedRole}` role. Sign in with an account that has the required realm role.
+            Access request denied for `{deniedRole}` role. Sign in with an account that has the required realm role.
           </p>
         ) : null}
 
