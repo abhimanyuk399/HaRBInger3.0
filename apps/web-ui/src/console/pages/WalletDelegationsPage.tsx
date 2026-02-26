@@ -4,6 +4,7 @@ import { ConsoleCard } from '../components/ConsoleCard';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime, truncate } from '../utils';
+import { TableSearchPager, usePagedFilter } from '../components/TableSearchPager';
 import { WALLET_OWNER_USER_ID } from '../identityConfig';
 
 export default function WalletDelegationsPage() {
@@ -15,6 +16,7 @@ export default function WalletDelegationsPage() {
   }, [refreshDelegations, refreshNominees]);
 
   const rows = useMemo(() => delegations ?? [], [delegations]);
+  const table = usePagedFilter(rows, { pageSize: 8, match: (row, q) => [row.delegateUserId, row.scope, row.status, row.id].join(' ').toLowerCase().includes(q) });
   const nomineeSet = useMemo(() => new Set((nominees ?? []).map((n) => n.nomineeUserId)), [nominees]);
 
   return (
@@ -28,6 +30,7 @@ export default function WalletDelegationsPage() {
       </ConsoleCard>
 
       <ConsoleCard>
+        <TableSearchPager {...table} placeholder="Search delegate / scope / status" />
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-xs text-slate-700">
             <thead className="text-[11px] uppercase tracking-wide text-slate-500">
@@ -41,14 +44,14 @@ export default function WalletDelegationsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {rows.length === 0 ? (
+              {table.paged.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-3 py-4 text-slate-500">
                     No delegations.
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => {
+                table.paged.map((row) => {
                   const status = String(row.status ?? '').toUpperCase();
                   const active = status === 'ACTIVE';
                   return (

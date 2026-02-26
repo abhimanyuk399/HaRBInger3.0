@@ -4,6 +4,7 @@ import { ConsoleCard } from '../components/ConsoleCard';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime, truncate } from '../utils';
+import { TableSearchPager, usePagedFilter } from '../components/TableSearchPager';
 
 type Row = Record<string, unknown>;
 
@@ -32,6 +33,8 @@ export default function WalletHistoryPage() {
       .sort((a, b) => String(b.updatedAt ?? b.createdAt ?? '').localeCompare(String(a.updatedAt ?? a.createdAt ?? '')));
   }, [walletConsents]);
 
+  const historyTable = usePagedFilter(history, { pageSize: 10, match: (row, q) => [String(row.id ?? row.consentId ?? ''), String(row.fiId ?? ''), String(row.purpose ?? ''), String(row.subjectUserId ?? ''), String(row.actedByUserId ?? ''), String(row.status ?? row.lifecycleStatus ?? '')].join(' ').toLowerCase().includes(q) });
+
   const selected = useMemo(() => {
     const id = selectedId ?? (history[0] ? String(history[0].id ?? history[0].consentId ?? '') : null);
     if (!id) return null;
@@ -50,6 +53,7 @@ export default function WalletHistoryPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <ConsoleCard>
+          <TableSearchPager {...historyTable} placeholder="Search service / label / status" />
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-xs text-slate-700">
               <thead className="text-[11px] uppercase tracking-wide text-slate-500">
@@ -63,14 +67,14 @@ export default function WalletHistoryPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {history.length === 0 ? (
+                {historyTable.paged.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-3 py-4 text-slate-500">
                       No historical consents.
                     </td>
                   </tr>
                 ) : (
-                  history.map((row) => {
+                  historyTable.paged.map((row) => {
                     const id = String(row.id ?? row.consentId ?? '');
                     const status = String(row.lifecycleStatus ?? row.status ?? '');
                     const meta = statusLabel(status);

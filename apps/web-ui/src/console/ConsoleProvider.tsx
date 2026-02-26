@@ -1035,18 +1035,9 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
     return created;
   }, []);
 
-  const pushFlashMessage = useCallback((tone: FlashMessage['tone'], message: string, detail?: string) => {
-    const normalized = message.trim();
-    if (!normalized) {
-      return;
-    }
-    const created: FlashMessage = {
-      id: createId(),
-      tone,
-      message: normalized,
-      ...(typeof detail === 'string' && detail.trim().length > 0 ? { detail: detail.trim() } : {}),
-    };
-    setFlashMessages((previous) => [created, ...previous].slice(0, 5));
+  const pushFlashMessage = useCallback((_tone: FlashMessage['tone'], _message: string, _detail?: string) => {
+    // UI requirement: suppress transient top popups/toasts after actions.
+    return;
   }, []);
 
   const dismissFlashMessage = useCallback((id: string) => {
@@ -1837,7 +1828,7 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
         status: 'success',
         detail: verified.tokenId,
       });
-      setStatusMessage('Assertion verification succeeded.');
+      setStatusMessage('Token verification succeeded.');
     } finally {
       setRunningAction(null);
     }

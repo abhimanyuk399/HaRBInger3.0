@@ -4,6 +4,7 @@ import { ConsoleCard } from '../components/ConsoleCard';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime, truncate } from '../utils';
+import { TableSearchPager, usePagedFilter } from '../components/TableSearchPager';
 
 type Row = Record<string, unknown>;
 
@@ -38,6 +39,8 @@ export default function WalletInboxPage() {
     if (!id) return null;
     return inbox.find((row) => String(row.id ?? row.consentId ?? '') === id) ?? null;
   }, [inbox, selectedId]);
+
+  const inboxTable = usePagedFilter(inbox, { pageSize: 8, match: (row, q) => [String(row.id ?? row.consentId ?? ''), String(row.fiId ?? ''), String(row.purpose ?? ''), String(row.subjectUserId ?? ''), String(row.status ?? row.lifecycleStatus ?? '')].join(' ').toLowerCase().includes(q) });
 
   const requestedFields = useMemo(() => {
     if (!selected) return [] as string[];
@@ -91,11 +94,12 @@ export default function WalletInboxPage() {
 
   return (
     <div className="space-y-4">
-      <PortalPageHeader title="Consent Inbox" subtitle="Pending requests (self + delegated). Select a row to view details." />
+      <PortalPageHeader title="Request Queue" subtitle="Pending requests (self + delegated). Select a row to view details." />
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <ConsoleCard>
-          <div className="overflow-x-auto">
+          <TableSearchPager {...inboxTable} placeholder="Search consent / FI / purpose / status" />
+        <div className="overflow-x-auto">
             <table className="min-w-full text-left text-xs text-slate-700">
               <thead className="text-[11px] uppercase tracking-wide text-slate-500">
                 <tr>
@@ -108,14 +112,14 @@ export default function WalletInboxPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {inbox.length === 0 ? (
+                {inboxTable.paged.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-3 py-4 text-slate-500">
                       No pending consents.
                     </td>
                   </tr>
                 ) : (
-                  inbox.map((row) => {
+                  inboxTable.paged.map((row) => {
                     const id = String(row.id ?? row.consentId ?? '');
                     const delegatedMode = String((row.delegatedContext as Row | undefined)?.mode ?? 'SELF');
                     const subjectUser = String(row.subjectUserId ?? '-');

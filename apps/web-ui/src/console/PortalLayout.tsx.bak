@@ -1,4 +1,4 @@
-import { ArrowLeft, Bell, ChevronDown, ChevronRight, LogIn, LogOut, Mail, Menu, Search, Settings } from 'lucide-react';
+import { ArrowLeft, ChevronRight, LogIn, LogOut, Menu, Search } from 'lucide-react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useState } from 'react';
 import { useConsole } from './ConsoleContext';
@@ -65,12 +65,12 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
 
   return (
     <div className="min-h-screen bg-[#eef1f7] text-slate-800">
-      <div className={cn('mx-auto grid min-h-screen max-w-[1720px] grid-cols-1 gap-4 p-4 xl:gap-5 xl:p-5', desktopSidebarCollapsed ? 'xl:grid-cols-[96px_1fr]' : 'xl:grid-cols-[286px_1fr]')}>
-        <aside className="rounded-[28px] border border-slate-200/90 bg-[#f7f9fd] p-4 text-slate-800 shadow-[0_14px_30px_rgba(15,23,42,0.06)] xl:sticky xl:top-5 xl:h-[calc(100vh-2.5rem)] xl:overflow-y-auto">
-          <div className={cn('mb-4 rounded-2xl border border-slate-200 bg-white p-4', desktopSidebarCollapsed && 'xl:p-3')}>
-            <div className="flex items-center gap-2"><span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-sm ring-1 ring-blue-200">◎</span><div className={cn('min-w-0', desktopSidebarCollapsed && 'xl:hidden')}><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-600">Bharat KYC T</p><p className="text-[11px] text-slate-500">Enterprise Console</p></div></div>
-            <h1 className={cn('mt-2 text-lg font-semibold tracking-tight text-slate-900', desktopSidebarCollapsed && 'xl:hidden')}>{title}</h1>
-            <p className={cn('mt-2 text-xs leading-relaxed text-slate-600', desktopSidebarCollapsed && 'xl:hidden')}>{subtitle}</p>
+      <div className={cn('mx-auto grid min-h-screen max-w-[1720px] grid-cols-1 gap-4 p-4 xl:gap-5 xl:p-5', desktopSidebarCollapsed ? 'xl:grid-cols-[88px_1fr]' : 'xl:grid-cols-[300px_1fr]')}>
+        <aside className="rounded-3xl border border-slate-200 bg-white p-4 text-slate-800 shadow-[0_16px_30px_rgba(15,23,42,0.08)] xl:sticky xl:top-5 xl:h-[calc(100vh-2.5rem)] xl:overflow-y-auto">
+          <div className="mb-4 rounded-2xl border border-slate-200 bg-[#f6f8fc] p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">Bharat KYC T</p>
+            <h1 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">{title}</h1>
+            <p className="mt-2 text-xs leading-relaxed text-slate-600">{subtitle}</p>
           </div>
 
           <button
@@ -108,14 +108,14 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
                     end={item.path === '/command' || item.path === '/wallet' || item.path === '/fi'}
                     className={({ isActive }) =>
                       cn(
-                        'group block rounded-2xl px-3 py-2.5 transition',
+                        'block rounded-xl px-3 py-2.5 transition',
                         isActive
-                          ? 'bg-[#eaf0ff] text-blue-700 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.12)]'
+                          ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
                           : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                       )
                     }
                   >
-                    <div className="flex items-center gap-2"><span className="inline-flex h-2 w-2 rounded-full bg-current opacity-60 group-hover:opacity-100" /><p className="text-sm font-semibold">{item.label}</p></div>
+                    <p className="text-sm font-semibold">{item.label}</p>
                     <p className="text-xs opacity-80">{item.description}</p>
                   </NavLink>
                 ))}
@@ -225,43 +225,27 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
         </aside>
 
         <div className="flex min-h-[65vh] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_16px_30px_rgba(15,23,42,0.08)] xl:h-[calc(100vh-2.5rem)] xl:min-h-0">
-          <header className="border-b border-slate-200 bg-gradient-to-b from-[#f9fbff] to-[#f6f9ff] px-6 py-4">
-            <div className="mb-3 flex flex-wrap items-center gap-3">
-              <div className="relative min-w-[210px] flex-1 sm:min-w-[320px] max-w-[520px]">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <header className="border-b border-slate-200 bg-[#f8faff] px-6 py-4">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[170px] flex-1 sm:min-w-[240px]">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <input
                   type="text"
-                  placeholder="Search portal modules, users, tokens..."
-                  className="h-11 w-full rounded-full border border-slate-200 bg-white px-10 pr-12 text-sm text-slate-700 shadow-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  placeholder="Search"
+                  className="h-10 w-full rounded-full border border-slate-200 bg-white px-9 text-sm text-slate-700 outline-none focus:border-blue-300"
                 />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">/</span>
               </div>
-              <div className="ml-auto flex items-center gap-2">
-                <button type="button" className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50">
-                  <Bell className="h-4 w-4" />
-                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
-                </button>
-                <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50">
-                  <Mail className="h-4 w-4" />
-                </button>
-                <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50">
-                  <Settings className="h-4 w-4" />
-                </button>
-                <div className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
-                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 shadow-sm">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-700">{(displayWalletIdentity(primaryIdentity, 'operator') || 'OP').slice(0,2).toUpperCase()}</span>
-                  <div className="hidden text-left sm:block">
-                    <p className="text-xs font-semibold leading-tight text-slate-800">{displayWalletIdentity(primaryIdentity, 'operator')}</p>
-                    <p className="text-[11px] leading-tight text-slate-500">{portalType === 'command' ? 'Command workspace' : portalType === 'wallet' ? 'Wallet workspace' : 'FI workspace'}</p>
-                  </div>
-                  <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                </div>
+              <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-right">
+                <p className="text-xs font-semibold text-slate-800">{displayWalletIdentity(primaryIdentity, 'operator')}</p>
+                <p className="text-[11px] text-slate-500">
+                  {portalType === 'command' ? 'Command workspace' : portalType === 'wallet' ? 'Wallet workspace' : 'FI workspace'}
+                </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-600">Portal Workspace</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Portal Workspace</p>
                 <h2 className="mt-0.5 text-2xl font-semibold tracking-tight text-slate-900">{title}</h2>
                 <p className="text-sm text-slate-600/95">{subtitle}</p>
               </div>
@@ -290,7 +274,7 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto bg-[#f4f7fc] p-4 sm:p-6">
+          <main className="flex-1 overflow-y-auto bg-[#f3f6fb] p-4 sm:p-6">
             <Outlet />
           </main>
         </div>
@@ -301,7 +285,7 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
 
 const walletNavItems: PortalNavItem[] = [
   { label: 'Home', path: '/wallet', description: 'Wallet overview and counters' },
-  { label: 'Request Queue', path: '/wallet/inbox', description: 'Pending requests (self + delegated)' },
+  { label: 'Consent Inbox', path: '/wallet/inbox', description: 'Pending requests (self + delegated)' },
   { label: 'Consent History', path: '/wallet/history', description: 'Approved, rejected, expired consents' },
   { label: 'Nominees', path: '/wallet/nominees', description: 'Create/disable nominees' },
   { label: 'Delegations', path: '/wallet/delegations', description: 'Delegations created from nominees' },

@@ -4,6 +4,9 @@ import { useEffect, useMemo } from 'react';
 import { useConsole } from '../ConsoleContext';
 import { displayWalletIdentity } from '../identityConfig';
 import { NotificationList } from '../components/NotificationList';
+import { TableSearchPager, usePagedFilter } from '../components/TableSearchPager';
+import { HomePlannerPanel } from '../components/HomePlannerPanel';
+import { DashboardKpiCard } from '../components/DashboardKpiCard';
 
 export default function FiHomePage() {
   const {
@@ -35,7 +38,7 @@ export default function FiHomePage() {
     });
 
     const successCount = verificationResults.filter((item) => item.mode === 'success').length;
-    const failCount = verificationResults.filter((item) => item.mode !== 'success').length;
+    const failCount = verificationResults.length > 0 ? verificationResults.filter((item) => item.mode !== 'success').length : failures.length;
 
     return { pending: pendingCount, approved: approvedCount, rejected: rejectedCount, verifySuccess: successCount, verifyFail: failCount };
   }, [walletConsents, verificationResults]);
@@ -51,6 +54,10 @@ export default function FiHomePage() {
     });
     return sorted.slice(0, 6);
   }, [walletConsents]);
+
+  const tokenCoverageRows = useMemo(() => fiTokenCoverage?.users ?? [], [fiTokenCoverage]);
+  const tokenCoverageTable = usePagedFilter(tokenCoverageRows, { pageSize: 5, match: (row, q) => [row.userId, row.status, (row as any).tokenId ?? '', row.expiresAt ?? ''].join(' ').toLowerCase().includes(q) });
+  const queuePreviewTable = usePagedFilter(queuePreview, { pageSize: 5, match: (consent, q) => [String((consent as any).subjectUserId ?? (consent as any).userId ?? (consent as any).walletUserId ?? ''), String((consent as any).purpose ?? ''), String((consent as any).status ?? ''), String((consent as any).fiId ?? (consent as any).requestedBy ?? '')].join(' ').toLowerCase().includes(q) });
 
   const nextActions = useMemo(() => {
     const actions: Array<{ title: string; subtitle: string; tone: 'primary' | 'warn' | 'neutral'; cta: string; to: string }> = [];
@@ -109,13 +116,13 @@ export default function FiHomePage() {
   }, [fiTokenCoverage, pending, verifyFail, verifySuccess]);
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(140deg,rgba(15,23,42,0.96),rgba(17,24,61,0.92),rgba(25,25,78,0.95))] p-6 text-white shadow-[0_24px_60px_rgba(2,6,23,0.42)]">
+    <div className="space-y-5 text-slate-800">
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-800 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">FI Overview</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">FI Overview</p>
             <h2 className="mt-2 text-3xl font-semibold tracking-tight">Hello, {displayWalletIdentity(activeFiUsername, 'fi analyst')} 👋</h2>
-            <p className="mt-2 max-w-2xl text-sm text-slate-300">
+            <p className="mt-2 max-w-2xl text-sm text-slate-600">
               {fiAuthenticated
                 ? 'Create consent requests, monitor the queue, and verify assertions with a complete audit trail.'
                 : 'Sign in to manage FI consent requests and verifications.'}
@@ -123,26 +130,26 @@ export default function FiHomePage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Verification</p>
+            <div className="rounded-2xl border border-slate-200 bg-[#f8faff] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">Verification</p>
               <div className="mt-2">
-                <p className="text-lg font-semibold text-cyan-200">
+                <p className="text-lg font-semibold text-blue-700">
                   {verifySuccess} success / {verifyFail} fail
                 </p>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-slate-500">
                   Ratio: {verifySuccess + verifyFail > 0 ? `${Math.round((verifySuccess / (verifySuccess + verifyFail)) * 100)}%` : 'n/a'}
                 </p>
               </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
+            <div className="rounded-2xl border border-slate-200 bg-[#f8faff] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Signal</p>
-                  <p className="mt-2 text-lg font-semibold text-rose-200">{latestFailure?.errorCode ?? 'No failures'}</p>
-                  <p className="mt-1 text-xs text-slate-400">Latest failure in this session</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">Signal</p>
+                  <p className="mt-2 text-lg font-semibold text-rose-700">{latestFailure?.errorCode ?? 'No failures'}</p>
+                  <p className="mt-1 text-xs text-slate-500">Latest failure in this session</p>
                 </div>
                 <button
-                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/20"
+                  className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                   onClick={() => void refreshWalletConsents()}
                   type="button"
                 >
@@ -155,55 +162,39 @@ export default function FiHomePage() {
         </div>
 
         <div className="mt-6 grid gap-3 md:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-            <p className="text-xs text-slate-300">Pending consents</p>
-            <p className="mt-2 text-3xl font-semibold text-amber-200">{pending}</p>
-            <p className="mt-1 text-xs text-slate-400">Awaiting wallet decision</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-            <p className="text-xs text-slate-300">Approved</p>
-            <p className="mt-2 text-3xl font-semibold text-emerald-200">{approved}</p>
-            <p className="mt-1 text-xs text-slate-400">Reusable KYC access</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-            <p className="text-xs text-slate-300">Rejected</p>
-            <p className="mt-2 text-3xl font-semibold text-rose-200">{rejected}</p>
-            <p className="mt-1 text-xs text-slate-400">Explicit denial</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-            <p className="text-xs text-slate-300">Verified assertions</p>
-            <p className="mt-2 text-3xl font-semibold text-indigo-200">{verifySuccess}</p>
-            <p className="mt-1 text-xs text-slate-400">Evidence-backed</p>
-          </div>
+          <DashboardKpiCard label="Pending consents" value={pending} hint="Awaiting wallet decision" tone="amber" Icon={Clock} />
+          <DashboardKpiCard label="Approved" value={approved} hint="Reusable KYC access" tone="emerald" Icon={BadgeCheck} />
+          <DashboardKpiCard label="Rejected" value={rejected} hint="Explicit denial" tone="rose" Icon={ShieldAlert} />
+          <DashboardKpiCard label="Verified assertions" value={verifySuccess} hint="Evidence-backed" tone="indigo" Icon={FileCheck2} />
         </div>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
         <div className="space-y-5">
-          <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#101a45)] p-5 text-slate-100">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 text-slate-800">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">General overview</p>
-                <p className="mt-1 text-sm text-slate-300">Shortcuts for core FI workflows.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">General overview</p>
+                <p className="mt-1 text-sm text-slate-600">Shortcuts for core FI workflows.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Link
                   to="/fi/create"
-                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/20"
+                  className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                 >
                   <ArrowRight className="h-4 w-4" />
                   Create
                 </Link>
                 <Link
                   to="/fi/queue"
-                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-300/20"
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-300/20"
                 >
                   <Clock className="h-4 w-4" />
                   Queue
                 </Link>
                 <Link
                   to="/fi/timeline"
-                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-300/20"
+                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                 >
                   <BadgeCheck className="h-4 w-4" />
                   Timeline
@@ -212,32 +203,32 @@ export default function FiHomePage() {
             </div>
 
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              <Link to="/fi/create" className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:bg-white/[0.07]">
+              <Link to="/fi/create" className="rounded-2xl border border-slate-200 bg-[#fafbff] p-4 hover:bg-[#f6f8fc]">
                 <p className="text-sm font-semibold">Create consent</p>
-                <p className="mt-1 text-xs text-slate-300">Raise requests with explicit purpose + field scope.</p>
+                <p className="mt-1 text-xs text-slate-600">Raise requests with explicit purpose + field scope.</p>
               </Link>
-              <Link to="/fi/queue" className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:bg-white/[0.07]">
+              <Link to="/fi/queue" className="rounded-2xl border border-slate-200 bg-[#fafbff] p-4 hover:bg-[#f6f8fc]">
                 <p className="text-sm font-semibold">Consent queue</p>
-                <p className="mt-1 text-xs text-slate-300">Track approvals, rejections, and expiries.</p>
+                <p className="mt-1 text-xs text-slate-600">Track approvals, rejections, and expiries.</p>
               </Link>
-              <Link to="/fi/timeline" className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:bg-white/[0.07]">
+              <Link to="/fi/timeline" className="rounded-2xl border border-slate-200 bg-[#fafbff] p-4 hover:bg-[#f6f8fc]">
                 <p className="text-sm font-semibold">Verification evidence</p>
-                <p className="mt-1 text-xs text-slate-300">Inspect signed assertions and registry anchors.</p>
+                <p className="mt-1 text-xs text-slate-600">Inspect signed assertions and registry anchors.</p>
               </Link>
-              <Link to="/command/audit" className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:bg-white/[0.07]">
+              <Link to="/command/audit" className="rounded-2xl border border-slate-200 bg-[#fafbff] p-4 hover:bg-[#f6f8fc]">
                 <p className="text-sm font-semibold">Audit trail</p>
-                <p className="mt-1 text-xs text-slate-300">End-to-end evidence across services.</p>
+                <p className="mt-1 text-xs text-slate-600">End-to-end evidence across services.</p>
               </Link>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#0b122b)] p-5 text-slate-100">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 text-slate-800">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Token coverage</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Token coverage</p>
               <button
                 type="button"
                 onClick={() => void refreshFiTokenCoverage()}
-                className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/20"
+                className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
               >
                 <RefreshCcw className="h-4 w-4" />
                 Refresh
@@ -245,36 +236,62 @@ export default function FiHomePage() {
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <p className="text-xs text-slate-300">Active</p>
-                <p className="mt-2 text-2xl font-semibold text-emerald-200">{fiTokenCoverage?.summary.active ?? 0}</p>
+              <div className="rounded-2xl border border-slate-200 bg-[#fafbff] p-4">
+                <p className="text-xs text-slate-600">Active</p>
+                <p className="mt-2 text-2xl font-semibold text-emerald-700">{fiTokenCoverage?.summary.active ?? 0}</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <p className="text-xs text-slate-300">Missing</p>
-                <p className="mt-2 text-2xl font-semibold text-rose-200">{fiTokenCoverage?.summary.none ?? 0}</p>
+              <div className="rounded-2xl border border-slate-200 bg-[#fafbff] p-4">
+                <p className="text-xs text-slate-600">Missing</p>
+                <p className="mt-2 text-2xl font-semibold text-rose-700">{fiTokenCoverage?.summary.none ?? 0}</p>
               </div>
             </div>
 
-            <div className="mt-4 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03]">
+            <div className="mt-4">
+              <TableSearchPager {...tokenCoverageTable} placeholder="Search user / token / status" />
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
               <table className="min-w-full text-left text-xs">
-                <thead className="text-[11px] uppercase tracking-wide text-slate-400">
+                <thead className="text-[11px] uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-4 py-3">User</th>
                     <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Purpose</th>
+                    <th className="px-4 py-3">FI</th>
+                    <th className="px-4 py-3">Updated</th>
+                    <th className="px-4 py-3">Token</th>
                     <th className="px-4 py-3">Expiry</th>
+                    <th className="px-4 py-3">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
-                  {(fiTokenCoverage?.users ?? []).map((row) => (
-                    <tr key={row.userId} className="hover:bg-white/[0.03]">
-                      <td className="px-4 py-3 text-slate-100">{row.userId}</td>
-                      <td className="px-4 py-3 text-slate-200">{row.status}</td>
-                      <td className="px-4 py-3 text-slate-400">{row.expiresAt ? row.expiresAt.slice(0, 10) : '—'}</td>
+                <tbody className="divide-y divide-slate-100">
+                  {tokenCoverageTable.paged.map((row) => (
+                    <tr key={row.userId} className="odd:bg-white even:bg-[#fbfcff] hover:bg-[#f3f7ff]">
+                      <td className="px-4 py-3 text-slate-800">{row.userId}</td>
+                      <td className="px-4 py-3 text-slate-700">{row.status}</td>
+                      <td className="px-4 py-3 text-slate-600">{String((row as any).purpose ?? (row as any).lastPurpose ?? '—')}</td>
+                      <td className="px-4 py-3 text-slate-600">{activeFiUsername ?? 'FI'}</td>
+                      <td className="px-4 py-3 text-slate-500">{String((row as any).updatedAt ?? '—').slice(0, 10) || '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{(row as any).tokenId ? String((row as any).tokenId).slice(0, 12) + '…' : '—'}</td>
+                      <td className="px-4 py-3 text-slate-500">{row.expiresAt ? row.expiresAt.slice(0, 10) : '—'}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {(String(row.status ?? '').toUpperCase() !== 'ACTIVE') ? (
+                            <Link
+                              to={`/fi/consent?user=${encodeURIComponent(String(row.userId ?? ''))}`}
+                              className="text-xs font-semibold text-emerald-700 hover:underline"
+                            >
+                              Onboard from FI
+                            </Link>
+                          ) : null}
+                          <Link to="/command/scenario" className="text-xs font-semibold text-blue-700 hover:underline">Fetch from CKYCR</Link>
+                        </div>
+                      </td>
                     </tr>
                   ))}
-                  {(fiTokenCoverage?.users ?? []).length === 0 && (
+                  {tokenCoverageTable.paged.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="px-4 py-3 text-slate-400">
+                      <td colSpan={8} className="px-4 py-3 text-slate-500">
                         No coverage data yet.
                       </td>
                     </tr>
@@ -284,56 +301,64 @@ export default function FiHomePage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#0b122b)] p-5 text-slate-100">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 text-slate-800">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Consent queue preview</p>
-                <p className="mt-1 text-sm text-slate-300">Latest items across pending/approved/rejected.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Consent queue preview</p>
+                <p className="mt-1 text-sm text-slate-600">Latest items across pending/approved/rejected.</p>
               </div>
-              <Link to="/fi/queue" className="text-xs font-semibold text-slate-200 hover:text-white hover:underline">
+              <Link to="/fi/queue" className="text-xs font-semibold text-slate-700 hover:text-slate-700 hover:underline">
                 View all
               </Link>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
+            <div className="mt-4">
+              <TableSearchPager {...queuePreviewTable} placeholder="Search user / purpose / status / FI" />
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-slate-200">
               <table className="w-full text-left text-sm">
-                <thead className="bg-white/[0.04] text-xs uppercase tracking-wider text-slate-300">
+                <thead className="bg-[#fafbff] text-xs uppercase tracking-wider text-slate-600">
                   <tr>
                     <th className="px-4 py-3">User</th>
                     <th className="px-4 py-3">Purpose</th>
                     <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">FI</th>
+                    <th className="px-4 py-3">Updated</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
-                  {queuePreview.length === 0 ? (
+                  {queuePreviewTable.paged.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-4 py-4 text-sm text-slate-300">
+                      <td colSpan={5} className="px-4 py-4 text-sm text-slate-600">
                         No requests yet.
                       </td>
                     </tr>
                   ) : (
-                    queuePreview.map((consent) => {
+                    queuePreviewTable.paged.map((consent) => {
                       const status = String((consent as any).status ?? '').toUpperCase();
                       const subject = String((consent as any).subjectUserId ?? (consent as any).userId ?? (consent as any).walletUserId ?? '—');
                       const purpose = String((consent as any).purpose ?? '—');
                       const rowKey = String((consent as any).id ?? (consent as any).consentId ?? `${subject}-${purpose}-${status}`);
                       return (
-                        <tr key={rowKey} className="hover:bg-white/[0.03]">
-                          <td className="px-4 py-3 text-slate-100">{subject}</td>
-                          <td className="px-4 py-3 text-slate-200">{purpose}</td>
+                        <tr key={rowKey} className="odd:bg-white even:bg-[#fbfcff] hover:bg-[#f3f7ff]">
+                          <td className="px-4 py-3 text-slate-800">{subject}</td>
+                          <td className="px-4 py-3 text-slate-700">{purpose}</td>
                           <td className="px-4 py-3">
                             <span
                               className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold ${
                                 status === 'APPROVED'
-                                  ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-200'
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                                   : status === 'REJECTED'
-                                    ? 'border-rose-300/30 bg-rose-300/10 text-rose-200'
-                                    : 'border-amber-300/30 bg-amber-300/10 text-amber-200'
+                                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                    : 'border-amber-300/30 bg-amber-300/10 text-amber-700'
                               }`}
                             >
                               {status || 'UNKNOWN'}
                             </span>
                           </td>
+                          <td className="px-4 py-3 text-slate-600">{String((consent as any).fiId ?? (consent as any).requestedBy ?? 'FI')}</td>
+                          <td className="px-4 py-3 text-slate-500">{String((consent as any).updatedAt ?? (consent as any).createdAt ?? '—').slice(0, 19).replace('T', ' ')}</td>
                         </tr>
                       );
                     })
@@ -345,23 +370,32 @@ export default function FiHomePage() {
         </div>
 
         <div className="space-y-5">
-          <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#101a3f)] p-5 text-slate-100">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Next actions</p>
+          <HomePlannerPanel
+            title="Upcoming actions"
+            items={[
+              { title: 'Review pending consents', time: 'Today · Queue', badge: String(pending) },
+              { title: 'Verification follow-up', time: 'Today · Timeline', badge: String(verifyFail) },
+              { title: 'Create new consent', time: 'Any time', badge: 'FI' },
+            ]}
+          />
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 text-slate-800">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Next actions</p>
             <div className="mt-4 space-y-2">
               {nextActions.map((action) => (
-                <div key={action.title} className="flex items-start justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div key={action.title} className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-[#fafbff] p-4">
                   <div>
-                    <p className="text-sm font-semibold text-slate-100">{action.title}</p>
-                    <p className="mt-1 text-xs text-slate-300">{action.subtitle}</p>
+                    <p className="text-sm font-semibold text-slate-800">{action.title}</p>
+                    <p className="mt-1 text-xs text-slate-600">{action.subtitle}</p>
                   </div>
                   <Link
                     to={action.to}
                     className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold ${
                       action.tone === 'warn'
-                        ? 'border-rose-300/30 bg-rose-300/10 text-rose-100 hover:bg-rose-300/20'
+                        ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-300/20'
                         : action.tone === 'primary'
-                          ? 'border-amber-300/30 bg-amber-300/10 text-amber-100 hover:bg-amber-300/20'
-                          : 'border-slate-300/20 bg-white/5 text-slate-100 hover:bg-white/10'
+                          ? 'border-amber-300/30 bg-amber-300/10 text-amber-700 hover:bg-amber-300/20'
+                          : 'border-slate-300/20 bg-white/5 text-slate-800 hover:bg-white/10'
                     }`}
                   >
                     {action.cta}
@@ -374,18 +408,18 @@ export default function FiHomePage() {
 
           <NotificationList title="Notifications" items={notifications} />
 
-          <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#0b122b)] p-5 text-slate-100">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Integrity signals</p>
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 text-slate-800">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Integrity signals</p>
             <div className="mt-4 space-y-2 text-sm">
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-[#fafbff] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><FileCheck2 className="h-4 w-4 text-cyan-300" /> Queue pressure</span>
                 <span className="font-semibold">{pending > 0 ? 'Pending items' : 'Clear'}</span>
               </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-[#fafbff] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><Filter className="h-4 w-4 text-indigo-300" /> Verification ratio</span>
                 <span className="font-semibold">{verifySuccess + verifyFail > 0 ? `${Math.round((verifySuccess / (verifySuccess + verifyFail)) * 100)}%` : 'n/a'}</span>
               </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-[#fafbff] px-4 py-3">
                 <span className="inline-flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-rose-300" /> Latest failure</span>
                 <span className="font-semibold">{latestFailure?.errorCode ?? 'None'}</span>
               </div>

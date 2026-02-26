@@ -5,6 +5,7 @@ import { ConsoleCard } from '../components/ConsoleCard';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime, truncate } from '../utils';
+import { TableSearchPager, usePagedFilter } from '../components/TableSearchPager';
 
 type TokenRow = {
   tokenId: string;
@@ -39,6 +40,7 @@ export default function RegistryPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [userIdFilter, setUserIdFilter] = useState('');
   const [userRefHash, setUserRefHash] = useState('');
+  const table = usePagedFilter(rows, { pageSize: 10, match: (row, q) => [row.tokenId, row.status, row.userRefHash, row.issuerId].join(' ').toLowerCase().includes(q) });
 
   async function load() {
     setLoading(true);
@@ -132,6 +134,7 @@ export default function RegistryPage() {
       </ConsoleCard>
 
       <ConsoleCard>
+        <TableSearchPager {...table} placeholder="Search token / status / hash" />
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-xs text-slate-700">
             <thead className="text-[11px] uppercase tracking-wide text-slate-500">
@@ -144,14 +147,14 @@ export default function RegistryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {rows.length === 0 ? (
+              {table.paged.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-3 py-4 text-slate-500">
                     No tokens found.
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => (
+                table.paged.map((row) => (
                   <tr key={row.tokenId} className="hover:bg-slate-50">
                     <td className="px-3 py-2">{formatDateTime(row.updatedAt)}</td>
                     <td className="px-3 py-2">

@@ -1,4 +1,4 @@
-import { AlertTriangle, BadgeCheck, ChevronRight, ClipboardCopy, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, ChevronRight, ClipboardCopy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import { useConsole } from '../ConsoleContext';
@@ -10,31 +10,13 @@ import { WalletAuthOptionalBanner } from '../components/WalletAuthOptionalBanner
 import { DEMO_BYPASS_WALLET_LOGIN } from '../portalFlags';
 import { formatDateTime, truncate } from '../utils';
 
-type VerifyTab = 'assertion' | 'token';
-
 function isWalletAuthErrorMessage(message: string) {
   const normalized = message.toLowerCase();
   return normalized.includes('login required') || normalized.includes('wallet');
 }
 
 export default function VerifierPage() {
-  const {
-    runningAction,
-    tokenId,
-    consentId,
-    registrySnapshot,
-    verificationResults,
-    verifyTokenSuccess,
-    verifyTokenFailNotActive,
-    verifyAssertionSuccess,
-    verifyAssertionFailTokenNotActive,
-    verifyAssertionFailConsentRejected,
-    verifyAssertionFailConsentExpired,
-    verifyAssertionSuccessReuse,
-    failures,
-  } = useConsole();
-
-  const [activeTab, setActiveTab] = useState<VerifyTab>('assertion');
+  const { runningAction, tokenId, consentId, registrySnapshot, verificationResults, verifyTokenSuccess, verifyTokenFailNotActive, failures } = useConsole();
   const [dismissWalletAuthBanner, setDismissWalletAuthBanner] = useState(false);
   const demoBypassWalletLogin = DEMO_BYPASS_WALLET_LOGIN;
 
@@ -50,27 +32,16 @@ export default function VerifierPage() {
     }
   };
 
-  const tabMeta = useMemo(() => {
-    if (activeTab === 'token') return { title: 'Token verification', subtitle: 'Validate token lifecycle and policy checks' };
-    return { title: 'Assertion verification', subtitle: 'Validate consent, audience/scope, and derived assertion' };
-  }, [activeTab]);
-
   const latestAuthFailure = useMemo(() => {
     return failures.find((failure) => isWalletAuthErrorMessage(`${failure.errorCode} ${failure.message}`)) ?? null;
   }, [failures]);
 
   return (
     <div className="space-y-4">
-      <WalletAuthOptionalBanner
-        open={demoBypassWalletLogin && !dismissWalletAuthBanner}
-        onDismiss={() => setDismissWalletAuthBanner(true)}
-      />
+      <WalletAuthOptionalBanner open={demoBypassWalletLogin && !dismissWalletAuthBanner} onDismiss={() => setDismissWalletAuthBanner(true)} />
+
       <ConsoleCard className="border-slate-200 bg-white">
-        <SectionHeader
-          title="Bharat KYC T - Verifier"
-          subtitle="Run verification checks and inspect outcomes."
-          action={<StatusPill status="neutral" label="Verifier" />}
-        />
+        <SectionHeader title="Bharat KYC T - Verifier" subtitle="Token verification only." action={<StatusPill status="neutral" label="Verifier" />} />
         <div className="mt-2 grid gap-2 md:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">IDs</p>
@@ -82,9 +53,7 @@ export default function VerifierPage() {
                 </button>
               ) : null}
             </p>
-            <p className="mt-1 text-xs text-slate-700">
-              consent <span className="font-mono">{truncate(consentId ?? '-', 20)}</span>
-            </p>
+            <p className="mt-1 text-xs text-slate-700">consent <span className="font-mono">{truncate(consentId ?? '-', 20)}</span></p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Registry</p>
@@ -101,78 +70,23 @@ export default function VerifierPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <ConsoleCard>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <SectionHeader title={tabMeta.title} subtitle={tabMeta.subtitle} />
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab('assertion')}
-                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                  activeTab === 'assertion' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                Assertion
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('token')}
-                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                  activeTab === 'token' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                Token
-              </button>
-            </div>
+          <SectionHeader title="Token verification" subtitle="Validate token lifecycle and policy checks" />
+          <div className="mt-3 space-y-2">
+            <ConsoleButton intent="primary" onClick={() => void verifyTokenSuccess()} disabled={runningAction !== null}>
+              <BadgeCheck className="h-4 w-4" />
+              Verify token (success)
+            </ConsoleButton>
+            <ConsoleButton intent="secondary" onClick={() => void verifyTokenFailNotActive()} disabled={runningAction !== null}>
+              <AlertTriangle className="h-4 w-4" />
+              Expected fail: NOT_ACTIVE
+            </ConsoleButton>
+            
           </div>
-
-          {activeTab === 'token' ? (
-            <div className="mt-3 space-y-2">
-              <ConsoleButton intent="primary" onClick={() => void verifyTokenSuccess()} disabled={runningAction !== null}>
-                <BadgeCheck className="h-4 w-4" />
-                Verify token (success)
-              </ConsoleButton>
-              <ConsoleButton intent="secondary" onClick={() => void verifyTokenFailNotActive()} disabled={runningAction !== null}>
-                <AlertTriangle className="h-4 w-4" />
-                Expected fail: NOT_ACTIVE
-              </ConsoleButton>
-              <p className="mt-2 text-xs text-slate-500">
-                Tip: use Scenario page to revoke/supersede tokens, then verify here.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-3 space-y-2">
-              <ConsoleButton intent="primary" onClick={() => void verifyAssertionSuccess()} disabled={runningAction !== null}>
-                <BadgeCheck className="h-4 w-4" />
-                Verify assertion (success)
-              </ConsoleButton>
-              <ConsoleButton intent="secondary" onClick={() => void verifyAssertionSuccessReuse()} disabled={runningAction !== null}>
-                <ShieldCheck className="h-4 w-4" />
-                Verify reuse (FI #2)
-              </ConsoleButton>
-              <ConsoleButton intent="secondary" onClick={() => void verifyAssertionFailTokenNotActive()} disabled={runningAction !== null}>
-                <AlertTriangle className="h-4 w-4" />
-                Expected fail: TOKEN_NOT_ACTIVE
-              </ConsoleButton>
-              <ConsoleButton intent="secondary" onClick={() => void verifyAssertionFailConsentRejected()} disabled={runningAction !== null}>
-                <AlertTriangle className="h-4 w-4" />
-                Expected fail: CONSENT_REJECTED
-              </ConsoleButton>
-              <ConsoleButton intent="secondary" onClick={() => void verifyAssertionFailConsentExpired()} disabled={runningAction !== null}>
-                <AlertTriangle className="h-4 w-4" />
-                Expected fail: CONSENT_EXPIRED
-              </ConsoleButton>
-              <p className="mt-2 text-xs text-slate-500">
-                Assertion verification depends on the wallet consent state. Use Wallet Ops to approve/reject.
-              </p>
-            </div>
-          )}
 
           {latestAuthFailure ? (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               <p className="font-semibold">This action needs wallet login in non-demo mode.</p>
-              <p className="mt-1 text-xs">
-                {latestAuthFailure.errorCode}: {latestAuthFailure.message}
-              </p>
+              <p className="mt-1 text-xs">{latestAuthFailure.errorCode}: {latestAuthFailure.message}</p>
               <Link to="/wallet/ops" className="mt-2 inline-flex items-center text-xs font-semibold hover:underline">
                 Open Wallet Ops <ChevronRight className="h-3.5 w-3.5" />
               </Link>
@@ -201,15 +115,6 @@ export default function VerifierPage() {
               </Link>
             </div>
           )}
-
-          <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
-            <p className="font-semibold text-slate-800">Recommended workflow</p>
-            <ol className="mt-1 list-decimal space-y-1 pl-4">
-              <li>Create a consent request on FI / Scenario page.</li>
-              <li>Approve or reject in Wallet Ops.</li>
-              <li>Verify assertion here, then inspect audit evidence.</li>
-            </ol>
-          </div>
         </ConsoleCard>
       </div>
     </div>

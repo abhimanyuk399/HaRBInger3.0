@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useConsole } from '../ConsoleContext';
 import { ConsoleCard } from '../components/ConsoleCard';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime } from '../utils';
+import { TableSearchPager, usePagedFilter } from '../components/TableSearchPager';
 import { WALLET_OWNER_USER_ID } from '../identityConfig';
 
 export default function WalletNomineesPage() {
-  const { nominees, refreshNominees, createNominee, setNomineeStatus, addNomineeDelegation, refreshDelegations } = useConsole();
+  const { nominees, refreshNominees, createNominee, setNomineeStatus } = useConsole();
   const [newNominee, setNewNominee] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -16,6 +18,7 @@ export default function WalletNomineesPage() {
   }, [refreshNominees]);
 
   const rows = useMemo(() => nominees ?? [], [nominees]);
+  const table = usePagedFilter(rows, { pageSize: 8, match: (row, q) => [row.nomineeUserId, row.status, row.id].join(' ').toLowerCase().includes(q) });
 
   return (
     <div className="space-y-4">
@@ -54,6 +57,7 @@ export default function WalletNomineesPage() {
       </ConsoleCard>
 
       <ConsoleCard>
+        <TableSearchPager {...table} placeholder="Search nominee / status" />
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-xs text-slate-700">
             <thead className="text-[11px] uppercase tracking-wide text-slate-500">
@@ -65,14 +69,14 @@ export default function WalletNomineesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {rows.length === 0 ? (
+              {table.paged.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-3 py-4 text-slate-500">
                     No nominees.
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => {
+                table.paged.map((row) => {
                   const active = String(row.status ?? '').toUpperCase() === 'ACTIVE';
                   return (
                     <tr key={row.id} className="hover:bg-slate-50">
@@ -92,21 +96,12 @@ export default function WalletNomineesPage() {
                           >
                             {active ? 'Disable' : 'Enable'}
                           </button>
-                          <button
-                            type="button"
-                            disabled={!active}
-                            className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-[11px] font-semibold text-indigo-800 hover:bg-indigo-100 disabled:opacity-60"
-                            onClick={async () => {
-                              // Create delegation directly from nominee list
-                              await addNomineeDelegation({
-                                ownerUserId: WALLET_OWNER_USER_ID,
-                                delegateUserId: row.nomineeUserId,
-                              });
-                              await refreshDelegations(WALLET_OWNER_USER_ID);
-                            }}
+                          <Link
+                            to="/wallet/delegations"
+                            className={`rounded-md border px-3 py-1.5 text-[11px] font-semibold ${active ? 'border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100' : 'pointer-events-none border-slate-200 bg-slate-100 text-slate-400'}`}
                           >
-                            Create delegation
-                          </button>
+                            Open delegation form
+                          </Link>
                         </div>
                       </td>
                     </tr>

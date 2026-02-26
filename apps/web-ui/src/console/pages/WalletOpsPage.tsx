@@ -12,6 +12,7 @@ import { SectionHeader } from '../components/SectionHeader';
 import { StatusPill } from '../components/StatusPill';
 import { WalletAuthOptionalBanner } from '../components/WalletAuthOptionalBanner';
 import { DEMO_BYPASS_WALLET_LOGIN } from '../portalFlags';
+import { TableSearchPager, usePagedFilter } from '../components/TableSearchPager';
 import { formatDateTime, truncate } from '../utils';
 
 type ConsentStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'UNKNOWN';
@@ -212,7 +213,7 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
 
   const isWalletPortalRoute = location.pathname.startsWith('/wallet');
   const isDelegationRoute = mode === 'delegation' || location.pathname.endsWith('/delegation');
-  const showConsentSections = mode !== 'delegation';
+  const showConsentSections = false; // UX requirement: remove consent inbox/review sections from Wallet Operations tab
   const showDelegationSections = mode !== 'consents';
   const fiPortalPath = isWalletPortalRoute ? '/fi/queue' : '/fi/queue';
   const auditPath = '/command/audit';
@@ -476,6 +477,10 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
       .slice(0, 24);
   }, [activities, activityFilter]);
 
+const filteredConsentsPager = usePagedFilter(filteredConsents, { pageSize: 6, match: (consent, q) => [consent.consentId, consent.tokenId, consent.fiId, consent.purpose, consent.requestedBy, consent.status].map((v) => String(v ?? '')).join(' ').toLowerCase().includes(q) });
+  const delegationsPager = usePagedFilter(delegationsList, { pageSize: 5, match: (d, q) => [d.id, d.delegateUserId, d.scope, ...(d.allowedPurposes ?? []), ...(d.allowedFields ?? []), d.status].map((v)=>String(v ?? '')).join(' ').toLowerCase().includes(q) });
+  const activityPager = usePagedFilter(filteredActivity, { pageSize: 8, match: (a, q) => [a.service, a.label, a.status, JSON.stringify(a.payload ?? {})].join(' ').toLowerCase().includes(q) });
+
   const actionDisabledByAuth = !authenticated && !demoBypassWalletLogin;
   const ownerActionDisabled = actionDisabledByAuth || (authenticated && !hasWalletOwnerRole);
   const nomineeActionDisabled = actionDisabledByAuth || (authenticated && !hasWalletNomineeRole);
@@ -682,8 +687,33 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
       .split(',')
       .map((value) => value.trim())
       .filter(Boolean);
-    const delegationFields = selectableFields.length > 0 ? selectableFields : ['name', 'dob', 'address'];
-    const expiry = delegationExpiryInput ? new Date(delegationExpiryInput).toISOString() : undefined;
+    const delegationFields = selectableFields.length > 0 ? selectableFields : [];
+    if (!nomineeName.trim()) {
+      setInlineWarning('Nominee username is required.');
+      setCreatingDelegation(false);
+      return;
+    }
+    if (!delegationScope.trim()) {
+      setInlineWarning('Scope is required to create delegation.');
+      setCreatingDelegation(false);
+      return;
+    }
+    if (allowedPurposes.length === 0) {
+      setInlineWarning('Allowed purpose is required. Enter at least one purpose.');
+      setCreatingDelegation(false);
+      return;
+    }
+    if (delegationFields.length === 0) {
+      setInlineWarning('Constraints are required. Select at least one allowed field.');
+      setCreatingDelegation(false);
+      return;
+    }
+    if (!delegationExpiryInput) {
+      setInlineWarning('Expiry is required for delegation.');
+      setCreatingDelegation(false);
+      return;
+    }
+    const expiry = new Date(delegationExpiryInput).toISOString();
 
     try {
       const createdDelegation = await addNomineeDelegation({
@@ -844,52 +874,11 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
             </div>
           </div>
 
-          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
-            <p className="font-semibold uppercase tracking-wide text-slate-500">Token Status</p>
-            <p className="mt-1 flex items-center gap-1">
-              <span className="font-semibold text-slate-800">tokenId:</span>
-              <span className="font-mono">
-                {truncate(readOptionalValue(displayWalletToken as Record<string, unknown> | null, 'tokenId') ?? tokenId ?? '-', 26)}
-              </span>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 font-semibold text-slate-700 hover:underline"
-                onClick={() => void copy(readOptionalValue(displayWalletToken as Record<string, unknown> | null, 'tokenId') ?? tokenId)}
-              >
-                <ClipboardCopy className="h-3.5 w-3.5" />
-                Copy
-              </button>
-            </p>
-            <p className="mt-1">
-              <span className="font-semibold text-slate-800">status:</span> {tokenLifecycleStatus}
-            </p>
-            <p className="mt-1">
-              <span className="font-semibold text-slate-800">expiry:</span>{' '}
-              {formatDateTime(
-                readOptionalValue(displayWalletToken as Record<string, unknown> | null, 'expiresAt') ??
-                  registrySnapshot?.expiresAt ??
-                  null
-              )}
-            </p>
-            <p className="mt-1">
-              <span className="font-semibold text-slate-800">Shared With:</span>{' '}
-              {approvedFiIdentifiers.length > 0 ? approvedFiIdentifiers.join(', ') : 'No approved FI sharing yet'}
-            </p>
-            <p className="mt-1">
-              <span className="font-semibold text-slate-800">Last Activity:</span>{' '}
-              {lastWalletActivity ? `${lastWalletActivity.label} (${formatDateTime(lastWalletActivity.at)})` : 'No wallet activity'}
-            </p>
-            {tokenNotOnboarded ? (
-              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-                <p className="font-semibold">Active token required</p>
-                <p className="mt-1">
-                  No ACTIVE token is available for this wallet user. Contact Issuer/Home Bank to onboard or refresh token.
-                </p>
-                <Link to="/command/operations#issuer-onboarding" className="mt-2 inline-flex items-center gap-1 font-semibold underline">
-                  Open Issuer onboarding <ExternalLink className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            ) : null}
+
+
+          <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-900">
+            <p className="font-semibold">Token status moved to Home</p>
+            <p className="mt-1">Current token status is now prominently shown on the Wallet Home dashboard to reduce duplication in Operations.</p>
           </div>
 
           <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -933,7 +922,7 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
           <>
         <ConsoleCard id="consent-inbox" className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,250,251,0.94))]">
           <SectionHeader
-            title="Consent Inbox"
+            title="Request Queue"
             subtitle="Select a consent request and approve/reject sharing."
             action={
               <div className="flex flex-wrap items-center gap-2">
@@ -970,10 +959,11 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
           </div>
 
           <div className="mt-3 max-h-[58vh] space-y-2 overflow-auto pr-1">
-            {filteredConsents.length === 0 ? (
+            <TableSearchPager query={filteredConsentsPager.query} setQuery={(v)=>{ setSearchQuery(v); filteredConsentsPager.setQuery(v); }} page={filteredConsentsPager.page} setPage={filteredConsentsPager.setPage} totalPages={filteredConsentsPager.totalPages} filteredCount={filteredConsentsPager.filteredCount} placeholder="Search consent inbox" />
+            {filteredConsentsPager.paged.length === 0 ? (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">No matching consents.</div>
             ) : (
-              filteredConsents.map((consent) => {
+              filteredConsentsPager.paged.map((consent) => {
                 const consentStatus = normalizeStatus(consent.status);
                 const statusBadge = statusMeta(consentStatus);
                 const consentRowId = resolveConsentId(consent);
@@ -1074,7 +1064,7 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
 
         <ConsoleCard id="consent-actions" className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))]">
           <SectionHeader
-            title="Consent Review & Actions"
+            title="Request Details & Actions"
             subtitle="Inspect consent details, choose fields, and approve or reject."
             action={
               <div className="flex items-center gap-2">
@@ -1310,7 +1300,7 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
               />
             </label>
             <label className="block text-xs font-semibold text-slate-700">
-              Allowed purposes (comma separated)
+              Allowed purposes (comma separated) *
               <input
                 type="text"
                 value={delegationPurposeInput}
@@ -1319,7 +1309,7 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
               />
             </label>
             <label className="block text-xs font-semibold text-slate-700">
-              Expiry (optional)
+              Expiry *
               <input
                 type="datetime-local"
                 value={delegationExpiryInput}
@@ -1362,11 +1352,12 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
             <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               Delegation list <InfoTooltip text="Shows nominee delegation records and their current status for the selected wallet owner." />
             </p>
+            <TableSearchPager query={delegationsPager.query} setQuery={delegationsPager.setQuery} page={delegationsPager.page} setPage={delegationsPager.setPage} totalPages={delegationsPager.totalPages} filteredCount={delegationsPager.filteredCount} placeholder="Search delegations" />
             <div className="max-h-64 space-y-2 overflow-auto pr-1">
-              {delegationsList.length === 0 ? (
+              {delegationsPager.paged.length === 0 ? (
                 <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">No delegation records.</p>
               ) : (
-                delegationsList.map((delegation) => {
+                delegationsPager.paged.map((delegation) => {
                   const status = String(delegation.status ?? 'UNKNOWN').toUpperCase();
                   const isActive = status === 'ACTIVE';
                   const statusPill = isActive ? 'ok' : status === 'REVOKED' ? 'error' : 'warn';
@@ -1448,11 +1439,12 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
             </button>
           ))}
         </div>
+        <TableSearchPager query={activityPager.query} setQuery={activityPager.setQuery} page={activityPager.page} setPage={activityPager.setPage} totalPages={activityPager.totalPages} filteredCount={activityPager.filteredCount} placeholder="Search activity timeline" />
         <div className="space-y-2">
-          {filteredActivity.length === 0 ? (
+          {activityPager.paged.length === 0 ? (
             <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">No activity for this filter.</p>
           ) : (
-            filteredActivity.map((activity) => {
+            activityPager.paged.map((activity) => {
               const status = activityStatusMeta(activity.status);
               const activityIds = extractActivityIds(activity);
               const target =

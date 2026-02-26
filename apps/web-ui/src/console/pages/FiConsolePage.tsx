@@ -11,6 +11,7 @@ import { InfoTooltip } from '../components/InfoTooltip';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { SectionHeader } from '../components/SectionHeader';
 import { StatusPill } from '../components/StatusPill';
+import { TableSearchPager, usePagedFilter } from '../components/TableSearchPager';
 import { formatDateTime, truncate } from '../utils';
 
 type ConsentLifecycle = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'UNKNOWN';
@@ -532,6 +533,11 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
       });
   }, [consentFilter, fiScopedRows, searchQuery]);
 
+  const filteredRowsPager = usePagedFilter(filteredRows, {
+    pageSize: 8,
+    match: (row, q) => [row.consentId, row.walletUsername, row.purpose, row.fiId, row.fiDisplayName, row.status].join(' ').toLowerCase().includes(q),
+  });
+
   const selectedConsent = useMemo(
     () => fiScopedRows.find((row) => row.consentId === selectedConsentId) ?? null,
     [fiScopedRows, selectedConsentId]
@@ -842,7 +848,8 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
             <form className="mt-3 space-y-3" onSubmit={(event) => void onCreateConsent(event)}>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">1) FI identity and wallet target</p>
-                <label className="mt-2 block text-xs font-semibold text-slate-700">
+                <div className="mt-2 grid gap-3 md:grid-cols-2">
+                <label className="block text-xs font-semibold text-slate-700">
                   Wallet username
                   <input
                     list="wallet-targets"
@@ -861,7 +868,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   ))}
                 </datalist>
 
-                <label className="mt-3 block text-xs font-semibold text-slate-700">
+                <label className="block text-xs font-semibold text-slate-700">
                   Customer CKYC ID (optional)
                   <input
                     type="text"
@@ -872,12 +879,13 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   />
                 </label>
 
-                <label className="mt-3 block text-xs font-semibold text-slate-700">
+                <label className="block text-xs font-semibold text-slate-700">
                   Acting FI
                   <select
                     value={actingFiId}
                     onChange={(event) => setActingFiId(event.target.value as (typeof FI_OPTIONS)[number]['id'])}
                     className="mt-1 kyc-form-select kyc-form-input-sm"
+                    disabled={fiAuthenticated}
                   >
                     {FI_OPTIONS.map((option) => (
                       <option key={option.id} value={option.id}>
@@ -887,7 +895,9 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   </select>
                 </label>
 
-                <div className="mt-2 flex items-center gap-2 text-xs text-slate-600">
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
                   <span>clientId: {actingFiId}</span>
                   <span>| display: {selectedFiLabel}</span>
                   <button
@@ -901,6 +911,9 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                 </div>
                 <div className="mt-2 rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-700">
                   <p className="font-semibold text-slate-900">Customer snapshot</p>
+                  <p className="mt-1">wallet username: {displayWalletIdentity(resolvedWalletTarget?.walletUsername ?? null)}</p>
+                  <p>KYC/customer id: {resolvedWalletTarget?.walletUserId ?? '-'}</p>
+                  <p className="text-[11px] text-slate-500">Username is wallet login alias; KYC/customer id is business identifier used in token/CKYCR records.</p>
                   <p className="mt-1">token status: {customerSnapshot.tokenStatus}</p>
                   <p>tokenId: {customerSnapshot.tokenId ? truncate(customerSnapshot.tokenId, 28) : '-'}</p>
                   <p>last consent: {customerSnapshot.latestConsentStatus}</p>
@@ -1248,17 +1261,27 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(event) => { setSearchQuery(event.target.value); filteredRowsPager.setQuery(event.target.value); filteredRowsPager.setPage(1); }}
                 className="kyc-form-input kyc-form-input-sm ml-auto w-full md:w-72"
                 placeholder="Search consentId / wallet / purpose"
               />
             </div>
 
-            <div className="mt-3 max-h-[56vh] space-y-2 overflow-auto pr-1">
-              {filteredRows.length === 0 ? (
+            <div className="mt-3">
+            <TableSearchPager
+              query={filteredRowsPager.query}
+              setQuery={(v) => { setSearchQuery(v); filteredRowsPager.setQuery(v); }}
+              page={filteredRowsPager.page}
+              setPage={filteredRowsPager.setPage}
+              totalPages={filteredRowsPager.totalPages}
+              filteredCount={filteredRowsPager.filteredCount}
+              placeholder="Search queue details"
+            />
+            <div className="max-h-[56vh] space-y-2 overflow-auto pr-1">
+              {filteredRowsPager.paged.length === 0 ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">No matching consents.</div>
               ) : (
-                filteredRows.map((row) => {
+                filteredRowsPager.paged.map((row) => {
                   const badge = statusBadge(row.status);
                   const selected = selectedConsentId === row.consentId;
                   return (
@@ -1313,12 +1336,6 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                           Open
                         </button>
                         <Link
-                          to={`${walletOpsBasePath}?consentId=${encodeURIComponent(row.consentId)}&wallet=${encodeURIComponent(row.walletUsername)}&policy=${encodeURIComponent(row.delegationRequired ? 'delegation_required' : 'owner')}`}
-                          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          Open Wallet
-                        </Link>
-                        <Link
                           to={`${auditBasePath}?consentId=${encodeURIComponent(row.consentId)}`}
                           className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                         >
@@ -1330,6 +1347,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                 })
               )}
             </div>
+          </div>
           </ConsoleCard>
           ) : null}
         </div>
@@ -1519,11 +1537,11 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
         {showActivityTimelineSection ? (
         <div>
           <ActivityTimeline
-            events={activities}
+            events={mode === 'timeline' ? activities.filter((event) => event.service === 'fi' || String(event.label ?? '').toLowerCase().includes('consent') || String(event.label ?? '').toLowerCase().includes('verify')) : activities}
             title="FI Activity Timeline"
             subtitle="Recent FI actions, consent transitions, and verification outcomes."
             links={{
-              verify: '/fi/queue',
+              verify: '/fi/timeline',
               consent: '/fi/queue',
               token: '/command/scenario',
               delegation: '/wallet/delegations',
