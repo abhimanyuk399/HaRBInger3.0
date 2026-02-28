@@ -4,19 +4,24 @@ import { ConsoleCard } from '../components/ConsoleCard';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime, truncate } from '../utils';
-import { TableSearchPager, usePagedFilter } from '../components/TableSearchPager';
 import { WALLET_OWNER_USER_ID } from '../identityConfig';
+import { ConfirmActionDialog } from '../components/ConfirmActionDialog';
+import { EmptyState, TableLoadingSkeleton } from '../components/FeedbackStates';
 
 export default function WalletDelegationsPage() {
   const { delegations, refreshDelegations, revokeDelegation, nominees, refreshNominees } = useConsole();
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [pendingDisableId, setPendingDisableId] = useState<string | null>(null);
 
   useEffect(() => {
-    void Promise.allSettled([refreshDelegations(WALLET_OWNER_USER_ID), refreshNominees(WALLET_OWNER_USER_ID)]);
+    let mounted = true;
+    setLoading(true);
+    void Promise.allSettled([refreshDelegations(WALLET_OWNER_USER_ID), refreshNominees(WALLET_OWNER_USER_ID)]).finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
   }, [refreshDelegations, refreshNominees]);
 
   const rows = useMemo(() => delegations ?? [], [delegations]);
-  const table = usePagedFilter(rows, { pageSize: 8, match: (row, q) => [row.delegateUserId, row.scope, row.status, row.id].join(' ').toLowerCase().includes(q) });
   const nomineeSet = useMemo(() => new Set((nominees ?? []).map((n) => n.nomineeUserId)), [nominees]);
 
   return (
@@ -30,76 +35,97 @@ export default function WalletDelegationsPage() {
       </ConsoleCard>
 
       <ConsoleCard>
-        <TableSearchPager {...table} placeholder="Search delegate / scope / status" />
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-xs text-slate-700">
-            <thead className="text-[11px] uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-3 py-2">Delegate</th>
-                <th className="px-3 py-2">Scope</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Expires</th>
-                <th className="px-3 py-2">Constraints</th>
-                <th className="px-3 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {table.paged.length === 0 ? (
+        {loading ? (
+          <TableLoadingSkeleton rows={5} cols={6} />
+        ) : rows.length === 0 ? (
+          <EmptyState
+            title="No delegations yet"
+            description="Create a delegation from the Nominees page. Active and disabled delegations will appear here."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-xs text-slate-700">
+              <thead className="text-[11px] uppercase tracking-wide text-slate-500">
                 <tr>
-                  <td colSpan={6} className="px-3 py-4 text-slate-500">
-                    No delegations.
-                  </td>
+                  <th className="px-3 py-2">Delegate</th>
+                  <th className="px-3 py-2">Scope</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Expires</th>
+                  <th className="px-3 py-2">Constraints</th>
+                  <th className="px-3 py-2">Actions</th>
                 </tr>
-              ) : (
-                table.paged.map((row) => {
-                  const status = String(row.status ?? '').toUpperCase();
-                  const active = status === 'ACTIVE';
-                  return (
-                    <tr key={row.id} className="hover:bg-slate-50">
-                      <td className="px-3 py-2">{row.delegateUserId}</td>
-                      <td className="px-3 py-2">{row.scope}</td>
-                      <td className="px-3 py-2">
-                        <StatusPill status={active ? 'ok' : status === 'EXPIRED' ? 'neutral' : 'warn'} label={status} />
-                      </td>
-                      <td className="px-3 py-2">{formatDateTime(row.expiresAt)}</td>
-                      <td className="px-3 py-2">
-                        <div className="space-y-0.5 text-[11px]">
-                          <div>purposes: {Array.isArray(row.allowedPurposes) ? row.allowedPurposes.join(', ') : '-'}</div>
-                          <div>fields: {Array.isArray(row.allowedFields) ? row.allowedFields.join(', ') : '-'}</div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <button
-                          type="button"
-                          disabled={!active || revoking === row.id}
-                          className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-[11px] font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-60"
-                          onClick={async () => {
-                            setRevoking(row.id);
-                            try {
-                              await revokeDelegation(row.id);
-                              await refreshDelegations(WALLET_OWNER_USER_ID);
-                            } finally {
-                              setRevoking(null);
-                            }
-                          }}
-                        >
-                          {revoking === row.id ? 'Revoking...' : 'Disable'}
-                        </button>
-                        {!nomineeSet.has(row.delegateUserId) ? (
-                          <div className="mt-1 text-[10px] text-amber-700">
-                            Note: nominee record missing for this delegate.
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-4 text-slate-500">
+                      No delegations.
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row) => {
+                    const status = String(row.status ?? '').toUpperCase();
+                    const active = status === 'ACTIVE';
+                    return (
+                      <tr key={row.id} className="hover:bg-slate-50">
+                        <td className="px-3 py-2">{row.delegateUserId}</td>
+                        <td className="px-3 py-2">{row.scope}</td>
+                        <td className="px-3 py-2">
+                          <StatusPill status={active ? 'ok' : status === 'EXPIRED' ? 'neutral' : 'warn'} label={status} />
+                        </td>
+                        <td className="px-3 py-2">{formatDateTime(row.expiresAt)}</td>
+                        <td className="px-3 py-2">
+                          <div className="space-y-0.5 text-[11px]">
+                            <div>purposes: {Array.isArray(row.allowedPurposes) ? row.allowedPurposes.join(', ') : '-'}</div>
+                            <div>fields: {Array.isArray(row.allowedFields) ? row.allowedFields.join(', ') : '-'}</div>
                           </div>
-                        ) : null}
-                        <div className="mt-1 text-[10px] text-slate-500">id: {truncate(row.id, 18)}</div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            disabled={!active || revoking === row.id}
+                            className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-[11px] font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-60"
+                            onClick={() => setPendingDisableId(row.id)}
+                          >
+                            {revoking === row.id ? 'Revoking...' : 'Disable'}
+                          </button>
+                          {!nomineeSet.has(row.delegateUserId) ? (
+                            <div className="mt-1 text-[10px] text-amber-700">
+                              Note: nominee record missing for this delegate.
+                            </div>
+                          ) : null}
+                          <div className="mt-1 text-[10px] text-slate-500">id: {truncate(row.id, 18)}</div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </ConsoleCard>
+
+      <ConfirmActionDialog
+        open={!!pendingDisableId}
+        title="Disable delegation"
+        message={<>This will disable the selected delegation and block future delegated approvals until re-created.</>}
+        confirmLabel="Disable delegation"
+        confirmTone="danger"
+        busy={!!revoking}
+        onCancel={() => { if (!revoking) setPendingDisableId(null); }}
+        onConfirm={async () => {
+          if (!pendingDisableId) return;
+          setRevoking(pendingDisableId);
+          try {
+            await revokeDelegation(pendingDisableId);
+            await refreshDelegations(WALLET_OWNER_USER_ID);
+            setPendingDisableId(null);
+          } finally {
+            setRevoking(null);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -188,7 +188,7 @@ const guidedStepHintsByLabel: Record<string, GuidedStepHint> = {
   'Issue Token': { target: '/command/scenario', expected: 'Registry token status becomes ACTIVE with a fresh tokenId.' },
   'FI Request Consent': { target: '/command/scenario', expected: 'New consentId is created with purpose + requested fields.' },
   'Wallet Approve (owner login required)': { target: '/wallet/ops', expected: 'Consent becomes APPROVED and an assertion JWT is issued.' },
-  'FI Verify Success': { target: '/command/scenario', expected: 'Token verification succeeds with aud/purpose/scope checks.' },
+  'FI Verify Success': { target: '/command/scenario', expected: 'Assertion verification succeeds with aud/purpose/scope checks.' },
   'Revoke Token': { target: '/command/scenario', expected: 'Registry token lifecycle changes to REVOKED.' },
   'FI Verify expected fail TOKEN_NOT_ACTIVE': { target: '/command/scenario', expected: 'Expected failure: FI verify returns TOKEN_NOT_ACTIVE.' },
   'CKYCR update and supersede': { target: '/command/scenario', expected: 'Old token superseded; new token ACTIVE with version change.' },

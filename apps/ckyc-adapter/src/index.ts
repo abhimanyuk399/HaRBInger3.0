@@ -61,6 +61,88 @@ const ckycPayloadSchema = z
   })
   .strict();
 
+
+const privacyPolicyKey = 'bharat:privacy:policy:v1';
+
+const retentionPolicySchema = z.object({
+  retentionDays: z.number().int().min(1).max(3650).default(365),
+  maskByDefault: z.boolean().default(true),
+  auditExportApproval: z.boolean().default(true),
+  sectorTemplate: z.enum(['banking', 'insurance', 'mutualfund']).default('banking'),
+});
+
+const aadhaarMockRequestSchema = z.object({
+  consentId: z.string().min(1),
+  otpRef: z.string().min(1),
+  userId: z.string().min(1).optional(),
+});
+
+const digilockerMockRequestSchema = z.object({
+  consentId: z.string().min(1),
+  docType: z.string().min(2).max(64),
+  userId: z.string().min(1).optional(),
+});
+
+type RetentionPolicy = z.infer<typeof retentionPolicySchema>;
+
+const defaultRetentionPolicy: RetentionPolicy = {
+  retentionDays: 365,
+  maskByDefault: true,
+  auditExportApproval: true,
+  sectorTemplate: 'banking',
+};
+
+
+async function getRetentionPolicy(): Promise<RetentionPolicy> {
+  try {
+    const raw = await redis.get(privacyPolicyKey);
+    if (!raw) return defaultRetentionPolicy;
+    return retentionPolicySchema.parse(JSON.parse(raw));
+  } catch {
+    return defaultRetentionPolicy;
+  }
+}
+
+async function saveRetentionPolicy(input: unknown): Promise<RetentionPolicy> {
+  const parsed = retentionPolicySchema.parse(input);
+  await redis.set(privacyPolicyKey, JSON.stringify(parsed));
+  return parsed;
+}
+
+function maskAadhaar(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  const tail = digits.slice(-4).padStart(4, '0');
+  return `XXXX-XXXX-${tail}`;
+}
+
+function applyPrivacyPolicyToMockPayload<T extends Record<string, unknown>>(payload: T, policy: RetentionPolicy): T & { _policy: Record<string, unknown> } {
+  const next = { ...payload } as Record<string, unknown>;
+  if (policy.maskByDefault) {
+    if (typeof next['aadhaar'] === 'string') {
+      next['aadhaar_masked'] = maskAadhaar(String(next['aadhaar']));
+      delete next['aadhaar'];
+    }
+    if (typeof next['pan'] === 'string') {
+      const pan = String(next['pan']);
+      next['pan_masked'] = `${pan.slice(0, 2)}****${pan.slice(-2)}`;
+      delete next['pan'];
+    }
+    if (typeof next['documentNumber'] === 'string') {
+      const doc = String(next['documentNumber']);
+      next['documentNumberMasked'] = `${doc.slice(0, 2)}***${doc.slice(-2)}`;
+      delete next['documentNumber'];
+    }
+  }
+  next['_policy'] = {
+    retentionDays: policy.retentionDays,
+    expiresAt: new Date(Date.now() + policy.retentionDays * 24 * 60 * 60 * 1000).toISOString(),
+    maskByDefault: policy.maskByDefault,
+    auditExportApproval: policy.auditExportApproval,
+    sectorTemplate: policy.sectorTemplate,
+  };
+  return next as T & { _policy: Record<string, unknown> };
+}
+
 function getActor(req: express.Request): string {
   const payload = req.oidc?.payload;
   if (!payload) return 'system';
@@ -537,6 +619,87 @@ app.post(
       issuedAt: supersedeResponse.issuedAt,
       expiresAt: supersedeResponse.expiresAt,
     });
+  })
+);
+
+
+
+app.get(
+  '/v1/adapters/privacy/policy',
+  asyncHandler(async (_req, res) => {
+    const policy = await getRetentionPolicy();
+    res.json({ policy });
+  })
+);
+
+app.put(
+  '/v1/adapters/privacy/policy',
+  asyncHandler(async (req, res) => {
+    const policy = await saveRetentionPolicy(req.body ?? {});
+    res.json({ ok: true, policy });
+  })
+);
+
+app.post(
+  '/v1/adapters/aadhaar/ekyc/mock',
+  asyncHandler(async (req, res) => {
+    const body = aadhaarMockRequestSchema.parse(req.body ?? {});
+    const policy = await getRetentionPolicy();
+    const raw = {
+      consentId: body.consentId,
+      otpRef: body.otpRef,
+      provider: 'Aadhaar',
+      status: 'VERIFIED',
+      aadhaar: '999988887777',
+      name: 'Demo User',
+      dob: '1992-03-21',
+      gender: 'F',
+      addressLine1: 'Demo Street 1',
+      pincode: '700001',
+      fetchedAt: new Date().toISOString(),
+    };
+    const responsePayload = applyPrivacyPolicyToMockPayload(raw, policy);
+
+    if (body.userId) {
+      await addCkycAuditEvent({
+        userId: body.userId,
+        eventType: 'AADHAAR_MOCK_EKYC_FETCHED',
+        actor: 'system',
+        detail: { consentId: body.consentId, masked: policy.maskByDefault, retentionDays: policy.retentionDays },
+      }).catch(() => undefined);
+    }
+
+    res.json({ connector: 'aadhaar', mode: 'mock', status: 'SUCCESS', payload: responsePayload });
+  })
+);
+
+app.post(
+  '/v1/adapters/digilocker/documents/mock',
+  asyncHandler(async (req, res) => {
+    const body = digilockerMockRequestSchema.parse(req.body ?? {});
+    const policy = await getRetentionPolicy();
+    const raw = {
+      consentId: body.consentId,
+      provider: 'DigiLocker',
+      status: 'FETCHED',
+      docType: body.docType.toUpperCase(),
+      documentId: `DL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+      documentNumber: body.docType.toUpperCase() === 'PAN' ? 'ABCDE1234F' : 'ID998877',
+      checksum: 'sha256:demo',
+      fetchedAt: new Date().toISOString(),
+    };
+    const responsePayload = applyPrivacyPolicyToMockPayload(raw, policy);
+
+    if (body.userId) {
+      await addCkycAuditEvent({
+        userId: body.userId,
+        eventType: 'DIGILOCKER_MOCK_DOCUMENT_FETCHED',
+        actor: 'system',
+        detail: { consentId: body.consentId, docType: body.docType, masked: policy.maskByDefault, retentionDays: policy.retentionDays },
+      }).catch(() => undefined);
+    }
+
+    res.json({ connector: 'digilocker', mode: 'mock', status: 'SUCCESS', payload: responsePayload });
   })
 );
 

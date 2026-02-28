@@ -11,13 +11,44 @@ import { InfoTooltip } from '../components/InfoTooltip';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { SectionHeader } from '../components/SectionHeader';
 import { StatusPill } from '../components/StatusPill';
-import { TableSearchPager, usePagedFilter } from '../components/TableSearchPager';
 import { formatDateTime, truncate } from '../utils';
 
 type ConsentLifecycle = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'UNKNOWN';
 type ConsentFilter = 'all' | 'pending' | 'approved' | 'rejected' | 'expired';
 type ApprovalPolicy = 'owner' | 'delegation_required' | 'either';
 type PurposeOption = 'Account Opening' | 'KYC Refresh' | 'Loan Processing' | 'Credit Card' | 'Periodic Review' | '__custom__';
+
+function downloadCsv(filename: string, rows: Array<Record<string, unknown>>) {
+  if (rows.length === 0) return;
+  const headers = Array.from(rows.reduce((set, row) => { Object.keys(row).forEach((k) => set.add(k)); return set; }, new Set<string>()));
+  const esc = (v: unknown) => {
+    const s = String(v ?? '');
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [headers.join(','), ...rows.map((row) => headers.map((h) => esc(row[h])).join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+
+function downloadJson(filename: string, payload: unknown) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 interface SessionConsentMeta {
   walletUsername: string;
@@ -132,7 +163,7 @@ function toConsentCreateErrorMessage(error: unknown) {
   const fallbackMessage = error.message || 'Failed to create consent.';
   const fallbackLower = fallbackMessage.toLowerCase();
   if (fallbackLower.includes('token_not_found') || fallbackLower.includes('no_active_token') || fallbackLower.includes('token required')) {
-    return 'Token required before requesting consent. Ask Issuer to onboard and activate token in Command Centre.';
+    return "Token required before requesting consent. Use 'Onboard user from FI' below (or Command Centre issuer onboarding) to create an ACTIVE token.";
   }
   if (fallbackLower.includes('consent_expired')) {
     return 'Consent has expired. Create a renewal request with updated expiry.';
@@ -319,6 +350,9 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
   const [consentFilter, setConsentFilter] = useState<ConsentFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedConsentId, setSelectedConsentId] = useState<string | null>(null);
+  const [queuePage, setQueuePage] = useState(1);
+  const [queueSort, setQueueSort] = useState<'newest' | 'oldest'>('newest');
+  const queuePageSize = 8;
 
   const [submitInfo, setSubmitInfo] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -517,7 +551,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
 
   const filteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return fiScopedRows
+    const rows = fiScopedRows
       .filter((row) => {
         if (consentFilter === 'all') {
           return true;
@@ -530,13 +564,26 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
         }
         const haystack = [row.consentId, row.walletUsername, row.purpose, row.fiId, row.fiDisplayName].join(' ').toLowerCase();
         return haystack.includes(query);
+      })
+      .sort((a, b) => {
+        const av = Date.parse(a.updatedAt ?? a.createdAt ?? '') || 0;
+        const bv = Date.parse(b.updatedAt ?? b.createdAt ?? '') || 0;
+        return queueSort === 'oldest' ? av - bv : bv - av;
       });
-  }, [consentFilter, fiScopedRows, searchQuery]);
+    return rows;
+  }, [consentFilter, fiScopedRows, queueSort, searchQuery]);
 
-  const filteredRowsPager = usePagedFilter(filteredRows, {
-    pageSize: 8,
-    match: (row, q) => [row.consentId, row.walletUsername, row.purpose, row.fiId, row.fiDisplayName, row.status].join(' ').toLowerCase().includes(q),
-  });
+  const queueTotalPages = Math.max(1, Math.ceil(filteredRows.length / queuePageSize));
+  const pagedFilteredRows = useMemo(
+    () => filteredRows.slice((queuePage - 1) * queuePageSize, queuePage * queuePageSize),
+    [filteredRows, queuePage, queuePageSize]
+  );
+
+  useEffect(() => {
+    if (queuePage > queueTotalPages) {
+      setQueuePage(queueTotalPages);
+    }
+  }, [queuePage, queueTotalPages]);
 
   const selectedConsent = useMemo(
     () => fiScopedRows.find((row) => row.consentId === selectedConsentId) ?? null,
@@ -704,7 +751,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
     }
     if (!hasActiveToken) {
       setSubmitError(
-        `Token required before requesting consent. No ACTIVE token found for wallet user ${resolvedWalletTarget.walletUserId}. Ask Issuer to onboard in Command Centre.`
+        `Token required before requesting consent. No ACTIVE token found for wallet user ${resolvedWalletTarget.walletUserId}. Use FI onboarding (or Command Centre issuer onboarding) to create the token.`
       );
       return;
     }
@@ -848,8 +895,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
             <form className="mt-3 space-y-3" onSubmit={(event) => void onCreateConsent(event)}>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">1) FI identity and wallet target</p>
-                <div className="mt-2 grid gap-3 md:grid-cols-2">
-                <label className="block text-xs font-semibold text-slate-700">
+                <label className="mt-2 block text-xs font-semibold text-slate-700">
                   Wallet username
                   <input
                     list="wallet-targets"
@@ -868,7 +914,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   ))}
                 </datalist>
 
-                <label className="block text-xs font-semibold text-slate-700">
+                <label className="mt-3 block text-xs font-semibold text-slate-700">
                   Customer CKYC ID (optional)
                   <input
                     type="text"
@@ -879,13 +925,12 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   />
                 </label>
 
-                <label className="block text-xs font-semibold text-slate-700">
+                <label className="mt-3 block text-xs font-semibold text-slate-700">
                   Acting FI
                   <select
                     value={actingFiId}
                     onChange={(event) => setActingFiId(event.target.value as (typeof FI_OPTIONS)[number]['id'])}
                     className="mt-1 kyc-form-select kyc-form-input-sm"
-                    disabled={fiAuthenticated}
                   >
                     {FI_OPTIONS.map((option) => (
                       <option key={option.id} value={option.id}>
@@ -895,9 +940,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   </select>
                 </label>
 
-                </div>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                <div className="mt-2 flex items-center gap-2 text-xs text-slate-600">
                   <span>clientId: {actingFiId}</span>
                   <span>| display: {selectedFiLabel}</span>
                   <button
@@ -911,9 +954,6 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                 </div>
                 <div className="mt-2 rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-700">
                   <p className="font-semibold text-slate-900">Customer snapshot</p>
-                  <p className="mt-1">wallet username: {displayWalletIdentity(resolvedWalletTarget?.walletUsername ?? null)}</p>
-                  <p>KYC/customer id: {resolvedWalletTarget?.walletUserId ?? '-'}</p>
-                  <p className="text-[11px] text-slate-500">Username is wallet login alias; KYC/customer id is business identifier used in token/CKYCR records.</p>
                   <p className="mt-1">token status: {customerSnapshot.tokenStatus}</p>
                   <p>tokenId: {customerSnapshot.tokenId ? truncate(customerSnapshot.tokenId, 28) : '-'}</p>
                   <p>last consent: {customerSnapshot.latestConsentStatus}</p>
@@ -923,7 +963,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs text-rose-900">
                     <p className="font-semibold">Token required before requesting consent</p>
                     <p className="mt-1">
-                      No ACTIVE token found for wallet user {resolvedWalletTarget?.walletUserId}. Ask Issuer to onboard and activate token in Command Centre.
+                      No ACTIVE token found for wallet user {resolvedWalletTarget?.walletUserId}. Use 'Onboard user from FI' below (or Command Centre issuer onboarding) to create an ACTIVE token.
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <button
@@ -1157,7 +1197,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
                     <p className="font-semibold">Create Consent disabled</p>
                     <p className="mt-1">
-                      No ACTIVE token found for wallet user {resolvedWalletTarget?.walletUserId}. Complete onboarding in Command Centre first.
+                      No ACTIVE token found for wallet user {resolvedWalletTarget?.walletUserId}. Complete FI onboarding here (or use Command Centre) first.
                     </p>
                     <Link to={issuerOnboardingPath} className="mt-2 inline-flex items-center gap-1 font-semibold underline">
                       Open Issuer onboarding <ChevronRight className="h-3.5 w-3.5" />
@@ -1223,12 +1263,6 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Link
-                    to={`${walletOpsBasePath}?consentId=${encodeURIComponent(lastCreatedRow.consentId)}&wallet=${encodeURIComponent(lastCreatedRow.walletUsername)}&policy=${encodeURIComponent(lastCreatedRow.delegationRequired ? 'delegation_required' : 'owner')}`}
-                    className="inline-flex items-center gap-1 rounded border border-slate-300 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-100"
-                  >
-                    Open Wallet Ops <ChevronRight className="h-3.5 w-3.5" />
-                  </Link>
-                  <Link
                     to={`${auditBasePath}?consentId=${encodeURIComponent(lastCreatedRow.consentId)}&fiId=${encodeURIComponent(lastCreatedRow.fiId)}`}
                     className="inline-flex items-center gap-1 rounded border border-slate-300 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-100"
                   >
@@ -1248,7 +1282,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                 <button
                   key={status}
                   type="button"
-                  onClick={() => setConsentFilter(status)}
+                  onClick={() => { setConsentFilter(status); setQueuePage(1); }}
                   className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
                     consentFilter === status
                       ? 'border-slate-900 bg-slate-900 text-white'
@@ -1261,33 +1295,84 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(event) => { setSearchQuery(event.target.value); filteredRowsPager.setQuery(event.target.value); filteredRowsPager.setPage(1); }}
+                onChange={(event) => { setSearchQuery(event.target.value); setQueuePage(1); }}
                 className="kyc-form-input kyc-form-input-sm ml-auto w-full md:w-72"
                 placeholder="Search consentId / wallet / purpose"
               />
             </div>
 
-            <div className="mt-3">
-            <TableSearchPager
-              query={filteredRowsPager.query}
-              setQuery={(v) => { setSearchQuery(v); filteredRowsPager.setQuery(v); }}
-              page={filteredRowsPager.page}
-              setPage={filteredRowsPager.setPage}
-              totalPages={filteredRowsPager.totalPages}
-              filteredCount={filteredRowsPager.filteredCount}
-              placeholder="Search queue details"
-            />
-            <div className="max-h-[56vh] space-y-2 overflow-auto pr-1">
-              {filteredRowsPager.paged.length === 0 ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => { setQueueSort('newest'); setQueuePage(1); }} className={`rounded-full border px-2.5 py-1 font-semibold ${queueSort === 'newest' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>Newest first</button>
+                <button type="button" onClick={() => { setQueueSort('oldest'); setQueuePage(1); }} className={`rounded-full border px-2.5 py-1 font-semibold ${queueSort === 'oldest' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>Oldest first</button>
+              </div>
+              <div className="ml-auto flex flex-wrap items-center gap-2 text-[11px]">
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 font-semibold text-amber-700">Pending {filteredRows.filter((r) => r.status === 'PENDING').length}</span>
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 font-semibold text-emerald-700">Approved {filteredRows.filter((r) => r.status === 'APPROVED').length}</span>
+                <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 font-semibold text-rose-700">SLA breach {filteredRows.filter((r) => {
+                  if (r.status !== 'PENDING') return false;
+                  const t = Date.parse(r.createdAt ?? r.updatedAt ?? '');
+                  return Number.isFinite(t) && Date.now() - t > 2 * 60 * 60 * 1000;
+                }).length}</span>
+                <span className="rounded-full border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-600">Showing {pagedFilteredRows.length}/{filteredRows.length}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    downloadCsv(
+                      `fi-consent-queue-${actingFiId}.csv`,
+                      filteredRows.map((r) => ({
+                        consentId: r.consentId,
+                        status: r.status,
+                        walletUsername: r.walletUsername,
+                        fiId: r.fiId,
+                        fiDisplayName: r.fiDisplayName,
+                        purpose: r.purpose,
+                        requestedFieldsCount: r.requestedFields.length,
+                        createdAt: r.createdAt ?? '',
+                        updatedAt: r.updatedAt ?? '',
+                        approvalPolicy: r.approvalPolicy,
+                      }))
+                    )
+                  }
+                  className="rounded border border-slate-300 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Export CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadJson(`fi-consent-queue-${actingFiId}.json`, {
+                    exportedAt: new Date().toISOString(),
+                    actingFiId,
+                    filter: consentFilter,
+                    query: searchQuery,
+                    sort: queueSort,
+                    rows: filteredRows,
+                  })}
+                  className="rounded border border-slate-300 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Export JSON
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-3 max-h-[56vh] space-y-2 overflow-auto pr-1">
+              {filteredRows.length === 0 ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">No matching consents.</div>
               ) : (
-                filteredRowsPager.paged.map((row) => {
+                pagedFilteredRows.map((row) => {
                   const badge = statusBadge(row.status);
                   const selected = selectedConsentId === row.consentId;
                   return (
                     <div
                       key={row.consentId}
-                      className={`rounded-xl border p-3 ${selected ? 'border-slate-900 bg-slate-100' : 'border-slate-200 bg-slate-50'}`}
+                      className={`rounded-xl border p-3 ${
+                        (() => {
+                          const createdTs = Date.parse(row.createdAt ?? row.updatedAt ?? '');
+                          const slaBreached = row.status === 'PENDING' && Number.isFinite(createdTs) && Date.now() - createdTs > 2 * 60 * 60 * 1000;
+                          if (selected) return slaBreached ? 'border-rose-300 bg-rose-50/70' : 'border-slate-900 bg-slate-100';
+                          return slaBreached ? 'border-rose-200 bg-rose-50/50' : 'border-slate-200 bg-slate-50';
+                        })()
+                      }`}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
@@ -1312,6 +1397,9 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                           <p className="mt-0.5 text-xs text-slate-500">
                             updated: {row.updatedAt ? formatDateTime(row.updatedAt) : '-'}
                           </p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            age: {(() => { const t = Date.parse(row.createdAt ?? row.updatedAt ?? ''); if (!Number.isFinite(t)) return '-'; const mins = Math.max(0, Math.floor((Date.now() - t) / 60000)); return mins < 60 ? `${mins}m` : `${Math.floor(mins/60)}h ${mins%60}m`; })()}
+                          </p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <StatusPill status={badge.status} label={badge.label} />
@@ -1325,6 +1413,12 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                                   : 'Owner approval'
                             }
                           />
+                          {(() => {
+                            const t = Date.parse(row.createdAt ?? row.updatedAt ?? '');
+                            const mins = Number.isFinite(t) ? Math.max(0, Math.floor((Date.now() - t) / 60000)) : 0;
+                            const breached = row.status === 'PENDING' && mins > 120;
+                            return breached ? <StatusPill status="error" label={`SLA >2h (${Math.floor(mins/60)}h ${mins%60}m)`} /> : null;
+                          })()}
                         </div>
                       </div>
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -1347,7 +1441,13 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                 })
               )}
             </div>
-          </div>
+            <div className="mt-3 flex items-center justify-between gap-2 text-xs">
+              <span className="text-slate-500">Page {queuePage} of {queueTotalPages}</span>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setQueuePage((p) => Math.max(1, p - 1))} disabled={queuePage <= 1} className="rounded border border-slate-300 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Prev</button>
+                <button type="button" onClick={() => setQueuePage((p) => Math.min(queueTotalPages, p + 1))} disabled={queuePage >= queueTotalPages} className="rounded border border-slate-300 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Next</button>
+              </div>
+            </div>
           </ConsoleCard>
           ) : null}
         </div>
@@ -1513,12 +1613,6 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
 
                 <div className="flex flex-wrap gap-2">
                   <Link
-                    to={`${walletOpsBasePath}?consentId=${encodeURIComponent(selectedConsent.consentId)}&wallet=${encodeURIComponent(selectedConsent.walletUsername)}&policy=${encodeURIComponent(selectedConsent.delegationRequired ? 'delegation_required' : 'owner')}`}
-                    className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    Open Wallet Ops <ChevronRight className="h-3.5 w-3.5" />
-                  </Link>
-                  <Link
                     to={`${auditBasePath}?consentId=${encodeURIComponent(selectedConsent.consentId)}`}
                     className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   >
@@ -1537,11 +1631,11 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
         {showActivityTimelineSection ? (
         <div>
           <ActivityTimeline
-            events={mode === 'timeline' ? activities.filter((event) => event.service === 'fi' || String(event.label ?? '').toLowerCase().includes('consent') || String(event.label ?? '').toLowerCase().includes('verify')) : activities}
+            events={activities}
             title="FI Activity Timeline"
             subtitle="Recent FI actions, consent transitions, and verification outcomes."
             links={{
-              verify: '/fi/timeline',
+              verify: '/fi/queue',
               consent: '/fi/queue',
               token: '/command/scenario',
               delegation: '/wallet/delegations',

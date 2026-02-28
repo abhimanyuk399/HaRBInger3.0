@@ -1,6 +1,5 @@
-import { ClipboardCopy, Search } from 'lucide-react';
+import { ClipboardCopy } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { TableSearchPager, usePagedFilter } from './TableSearchPager';
 import { Link } from 'react-router-dom';
 import type { ActivityEvent, ActivityStatus, ServiceName } from '../types';
 import { formatDateTime, serviceLabel } from '../utils';
@@ -98,7 +97,6 @@ export function ActivityTimeline({
   const [serviceFilter, setServiceFilter] = useState<'all' | ServiceName>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | ActivityStatus>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | ActivityType>('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
 
   const copy = async (value: string) => {
@@ -113,19 +111,13 @@ export function ActivityTimeline({
     }
   };
 
-  const filteredBase = useMemo(() => {
+  const filtered = useMemo(() => {
     return events
       .filter((event) => (serviceFilter === 'all' ? true : event.service === serviceFilter))
       .filter((event) => (statusFilter === 'all' ? true : event.status === statusFilter))
       .filter((event) => (typeFilter === 'all' ? true : inferActivityType(event) === typeFilter))
       .slice(0, maxItems);
   }, [events, maxItems, serviceFilter, statusFilter, typeFilter]);
-
-  const timelinePager = usePagedFilter(filteredBase, {
-    pageSize: 8,
-    query: searchQuery,
-    match: (event, q) => `${event.id} ${event.label} ${event.service} ${event.status} ${detailAsText(event.detail)}`.toLowerCase().includes(q),
-  });
 
   return (
     <ConsoleCard className={className}>
@@ -167,33 +159,11 @@ export function ActivityTimeline({
         </select>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <label className="relative min-w-[220px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search timeline id / label / details"
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs text-slate-700 outline-none ring-0 placeholder:text-slate-400 focus:border-blue-300"
-          />
-        </label>
-        <TableSearchPager
-          query={timelinePager.query}
-          setQuery={setSearchQuery}
-          page={timelinePager.page}
-          setPage={timelinePager.setPage}
-          totalPages={timelinePager.totalPages}
-          filteredCount={timelinePager.filteredCount}
-          compact
-          hideSearch
-        />
-      </div>
-
       <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
-        {timelinePager.paged.length === 0 ? (
+        {filtered.length === 0 ? (
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">No matching activity.</p>
         ) : (
-          timelinePager.paged.map((event) => {
+          filtered.map((event) => {
             const eventType = inferActivityType(event);
             const deepLink = links?.[eventType];
             const detail = detailAsText(event.detail);

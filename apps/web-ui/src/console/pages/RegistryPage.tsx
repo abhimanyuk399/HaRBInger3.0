@@ -4,8 +4,8 @@ import { getWalletAccessToken } from '../../lib/keycloak';
 import { ConsoleCard } from '../components/ConsoleCard';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
+import { EmptyState, TableLoadingSkeleton } from '../components/FeedbackStates';
 import { formatDateTime, truncate } from '../utils';
-import { TableSearchPager, usePagedFilter } from '../components/TableSearchPager';
 
 type TokenRow = {
   tokenId: string;
@@ -33,6 +33,17 @@ async function computeUserRefHashFromIdentifier(identifier: string): Promise<str
   return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('');
 }
 
+
+function downloadJson(filename: string, payload: unknown) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function RegistryPage() {
   const [rows, setRows] = useState<TokenRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -40,7 +51,6 @@ export default function RegistryPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [userIdFilter, setUserIdFilter] = useState('');
   const [userRefHash, setUserRefHash] = useState('');
-  const table = usePagedFilter(rows, { pageSize: 10, match: (row, q) => [row.tokenId, row.status, row.userRefHash, row.issuerId].join(' ').toLowerCase().includes(q) });
 
   async function load() {
     setLoading(true);
@@ -129,33 +139,38 @@ export default function RegistryPage() {
           >
             {loading ? 'Loading...' : 'Refresh'}
           </button>
+          <button
+            type="button"
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            disabled={loading || rows.length === 0}
+            onClick={() => downloadJson('registry-tokens.json', { exportedAt: new Date().toISOString(), statusFilter, userIdFilter, userRefHash, rows })}
+          >
+            Export JSON
+          </button>
         </div>
         {error ? <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900">{error}</p> : null}
       </ConsoleCard>
 
       <ConsoleCard>
-        <TableSearchPager {...table} placeholder="Search token / status / hash" />
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-xs text-slate-700">
-            <thead className="text-[11px] uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-3 py-2">Updated</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Token</th>
-                <th className="px-3 py-2">UserRefHash</th>
-                <th className="px-3 py-2">Expires</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {table.paged.length === 0 ? (
+        {loading ? (
+          <TableLoadingSkeleton rows={6} cols={5} />
+        ) : rows.length === 0 ? (
+          <EmptyState title="No tokens found" description="Try changing status or user filters, then refresh the registry view." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-xs text-slate-700">
+              <thead className="text-[11px] uppercase tracking-wide text-slate-500">
                 <tr>
-                  <td colSpan={5} className="px-3 py-4 text-slate-500">
-                    No tokens found.
-                  </td>
+                  <th className="px-3 py-2">Updated</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Token</th>
+                  <th className="px-3 py-2">UserRefHash</th>
+                  <th className="px-3 py-2">Expires</th>
                 </tr>
-              ) : (
-                table.paged.map((row) => (
-                  <tr key={row.tokenId} className="hover:bg-slate-50">
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {rows.map((row, index) => (
+                  <tr key={row.tokenId} className={index % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/40 hover:bg-slate-50'}>
                     <td className="px-3 py-2">{formatDateTime(row.updatedAt)}</td>
                     <td className="px-3 py-2">
                       <StatusPill
@@ -167,11 +182,11 @@ export default function RegistryPage() {
                     <td className="px-3 py-2">{truncate(row.userRefHash, 18)}</td>
                     <td className="px-3 py-2">{formatDateTime(row.expiresAt)}</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </ConsoleCard>
     </div>
   );

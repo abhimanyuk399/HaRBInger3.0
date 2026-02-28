@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { useConsole } from '../ConsoleContext';
+import { FlashStack } from './FlashStack';
 
 interface AuthPageShellProps {
   portalLabel: string;
@@ -137,9 +139,11 @@ export function AuthPageShell({
   children,
 }: AuthPageShellProps) {
   const visual = visualTheme[visualVariant];
+  const { flashMessages, dismissFlashMessage } = useConsole();
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_55%),radial-gradient(circle_at_bottom,rgba(16,185,129,0.16),transparent_52%),linear-gradient(135deg,#020617,#0b1025,#0f1b44)] p-2 sm:p-4">
+      <FlashStack messages={flashMessages} onDismiss={dismissFlashMessage} />
       <div className="mx-auto min-h-[calc(100vh-1rem)] w-full max-w-[1720px] overflow-hidden rounded-[26px] border border-white/10 bg-white/5 shadow-[0_30px_72px_rgba(2,6,23,0.55)] backdrop-blur sm:rounded-[34px] lg:h-[calc(100vh-2rem)] lg:max-h-[980px] lg:min-h-0">
         <div className="grid h-full lg:grid-cols-[minmax(520px,1fr)_minmax(500px,1fr)]">
           <section className={`relative hidden overflow-hidden ${visual.panelBg} lg:block`}>

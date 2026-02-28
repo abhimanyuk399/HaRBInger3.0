@@ -9,6 +9,7 @@ import { EvidencePanel } from '../components/EvidencePanel';
 import { JsonBlock } from '../components/JsonBlock';
 import { WalletAuthOptionalBanner } from '../components/WalletAuthOptionalBanner';
 import { SectionHeader } from '../components/SectionHeader';
+import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { FI_CLIENT_ID, WALLET_NOMINEE_USERNAME, WALLET_OWNER_USERNAME } from '../identityConfig';
 import { DEMO_BYPASS_WALLET_LOGIN } from '../portalFlags';
@@ -200,6 +201,21 @@ export default function ScenarioOrchestrationPage() {
   };
 
   const today = new Date().toISOString().slice(0, 10);
+
+  const lifecycleStages = [
+    { key: 'token', label: 'Token lifecycle', state: String(registrySnapshot?.status ?? 'UNKNOWN'), hint: registrySnapshot?.tokenId ? `Token ${String(registrySnapshot.tokenId).slice(0, 14)}…` : 'Issue token to start flow' },
+    { key: 'consent', label: 'Consent', state: String(consentStatus ?? 'NONE').toUpperCase(), hint: consentId ? `Consent ${consentId.slice(0, 14)}…` : 'Create consent request from FI' },
+    { key: 'expiry', label: 'Renewal / expiry', state: consentExpiresAt ? 'TRACKED' : 'PENDING', hint: consentExpiresAt ? `Expiry ${formatDateTime(String(consentExpiresAt))}` : 'Create consent to track expiry / renewal' },
+    { key: 'periodic', label: 'Periodic KYC review', state: reviewRun ? 'RUN_AVAILABLE' : dueUsers.length ? 'DUE_USERS_LOADED' : 'NOT_RUN', hint: reviewRun ? `Actions: ${reviewRun.actions}` : dueUsers.length ? `${dueUsers.length} due user(s) loaded` : 'Load due users and run scheduler' },
+  ] as const;
+
+  const runPeriodicLifecyclePolish = async () => {
+    await loadDueUsers(today);
+    await runReviewOnce(today);
+    if (consentStatus && String(consentStatus).toUpperCase() === 'EXPIRED') {
+      await renewConsent();
+    }
+  };
 
   const stepDefinitions: ScenarioStep[] = [
     {
@@ -422,7 +438,59 @@ export default function ScenarioOrchestrationPage() {
         />
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_1fr]">
+      <div className="space-y-4">
+        <PortalPageHeader
+          title="Scenario Orchestration"
+          subtitle="Run end-to-end tokenised KYC demos with lifecycle controls, periodic review, CKYCR supersede, and delegation proof."
+          environmentLabel="Demo"
+          badges={
+            <>
+              <StatusPill status={registrySnapshot?.status === 'ACTIVE' ? 'ok' : registrySnapshot?.status ? 'warn' : 'neutral'} label={`Token: ${String(registrySnapshot?.status ?? 'N/A')}`} />
+              <StatusPill status={String(consentStatus ?? '').toUpperCase() === 'APPROVED' ? 'ok' : consentStatus ? 'warn' : 'neutral'} label={`Consent: ${String(consentStatus ?? 'N/A')}`} />
+              <StatusPill status={reviewRun ? 'ok' : dueUsers.length ? 'warn' : 'neutral'} label={reviewRun ? 'Periodic review run complete' : dueUsers.length ? `Due users: ${dueUsers.length}` : 'Periodic review not run'} />
+            </>
+          }
+        />
+
+        <ConsoleCard className="border-slate-200 bg-white/95">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle>Periodic KYC + Lifecycle Demo Path</CardTitle>
+              <CardHint className="mt-1">Use this guided area during demo to show revocation, renewal, periodic update scheduling, and CKYCR supersede in one place.</CardHint>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <ConsoleButton size="sm" intent="secondary" onClick={() => void runPeriodicLifecyclePolish()} disabled={runningAction !== null}>Run periodic review</ConsoleButton>
+              <ConsoleButton size="sm" intent="secondary" onClick={() => void renewConsent()} disabled={runningAction !== null}>Renew consent</ConsoleButton>
+              <ConsoleButton size="sm" intent="secondary" onClick={() => void runCkycSupersede()} disabled={runningAction !== null}>CKYCR supersede</ConsoleButton>
+              <ConsoleButton size="sm" intent="secondary" onClick={() => void runRevokeVerifyFailFlow()} disabled={runningAction !== null}>Revoke → fail verify</ConsoleButton>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {lifecycleStages.map((stage) => {
+              const okStates = ['ACTIVE', 'APPROVED', 'TRACKED', 'RUN_AVAILABLE'];
+              const warnStates = ['REVOKED', 'EXPIRED', 'DUE_USERS_LOADED'];
+              const state = String(stage.state);
+              const tone = okStates.includes(state) ? 'ok' : warnStates.includes(state) ? 'warn' : 'neutral';
+              return (
+                <div key={stage.key} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{stage.label}</p>
+                    <StatusPill status={tone as any} label={state.replaceAll('_', ' ')} />
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-600">{stage.hint}</p>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            <Link to="/command/registry" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Open Registry Lifecycle</Link>
+            <Link to="/command/audit" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Open Audit Trail</Link>
+            <Link to="/fi/timeline" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Open FI Timeline</Link>
+            <Link to="/wallet/history" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Open Wallet History</Link>
+          </div>
+        </ConsoleCard>
+
+        <div className="grid gap-4 xl:grid-cols-[1.15fr_1fr]">
         <ConsoleCard>
           <div className="mb-4">
             <WalletAuthOptionalBanner
@@ -476,7 +544,7 @@ export default function ScenarioOrchestrationPage() {
         </div>
 
         <div className="mb-4 grid gap-2 md:grid-cols-2">
-          <section id="scenario-a-run" className="rounded-xl border border-slate-200 bg-white p-3">
+          <section id="scenario-a-run" className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">Run Scenario A (loan-underwriting)</p>
             <p className="mt-1 text-xs text-slate-600">
               Runs issue {'->'} request {'->'} approve {'->'} verify {'->'} revoke {'->'} TOKEN_NOT_ACTIVE.
@@ -486,7 +554,7 @@ export default function ScenarioOrchestrationPage() {
             </ConsoleButton>
           </section>
 
-          <section id="scenario-b-run" className="rounded-xl border border-slate-200 bg-white p-3">
+          <section id="scenario-b-run" className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">Run Scenario B (insurance-claim)</p>
             <p className="mt-1 text-xs text-slate-600">Reuses same orchestration with insurance purpose/scope defaults.</p>
             <ConsoleButton className="mt-2 w-full" onClick={() => void runScenarioBInsurance()} disabled={runningAction !== null}>
@@ -494,7 +562,7 @@ export default function ScenarioOrchestrationPage() {
             </ConsoleButton>
           </section>
 
-          <section id="consent-reject-quick" className="rounded-xl border border-slate-200 bg-white p-3">
+          <section id="consent-reject-quick" className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">Consent Reject Flow</p>
             <p className="mt-1 text-xs text-slate-600">Forces reject branch and verifies CONSENT_REJECTED.</p>
             <ConsoleButton className="mt-2 w-full" intent="secondary" onClick={() => void runConsentRejectFlow()} disabled={runningAction !== null}>
@@ -502,7 +570,7 @@ export default function ScenarioOrchestrationPage() {
             </ConsoleButton>
           </section>
 
-          <section id="consent-expiry-renew-quick" className="rounded-xl border border-slate-200 bg-white p-3">
+          <section id="consent-expiry-renew-quick" className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">Consent Expiry + Renew</p>
             <p className="mt-1 text-xs text-slate-600">Wait until consent TTL passes, then run verify fail and renew.</p>
             <div className="mt-2 grid gap-2">
@@ -515,7 +583,7 @@ export default function ScenarioOrchestrationPage() {
             </div>
           </section>
 
-          <section id="ckyc-supersede-quick" className="rounded-xl border border-slate-200 bg-white p-3">
+          <section id="ckyc-supersede-quick" className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">CKYCR Supersede Flow</p>
             <p className="mt-1 text-xs text-slate-600">Simulate CKYCR update and sync supersede chain.</p>
             <ConsoleButton className="mt-2 w-full" intent="secondary" onClick={() => void runCkycSupersede()} disabled={runningAction !== null}>
@@ -523,7 +591,7 @@ export default function ScenarioOrchestrationPage() {
             </ConsoleButton>
           </section>
 
-          <section id="revoke-verify-fail-quick" className="rounded-xl border border-slate-200 bg-white p-3">
+          <section id="revoke-verify-fail-quick" className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">Revoke + Verify Fail</p>
             <p className="mt-1 text-xs text-slate-600">Runs revoke and immediate verify failure check.</p>
             <ConsoleButton className="mt-2 w-full" intent="secondary" onClick={() => void runRevokeVerifyFailFlow()} disabled={runningAction !== null}>
@@ -554,7 +622,7 @@ export default function ScenarioOrchestrationPage() {
             const isGatedStep = guided.runnerStatus === 'paused_waiting_login' && step.id === gatedScenarioStepId;
             const isResumingStep = guided.runnerStatus === 'running' && step.id === resumingStepId;
             return (
-              <section key={step.id} id={step.id} className="rounded-xl border border-slate-200 bg-white p-3">
+              <section key={step.id} id={step.id} className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-semibold text-slate-900">{step.title}</h4>
@@ -757,6 +825,7 @@ export default function ScenarioOrchestrationPage() {
             </div>
           </ConsoleCard>
         ) : null}
+        </div>
         </div>
       </div>
     </>

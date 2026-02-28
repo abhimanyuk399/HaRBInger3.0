@@ -1,9 +1,10 @@
-import { ArrowLeft, Bell, ChevronDown, ChevronRight, LogIn, LogOut, Mail, Menu, Search, Settings } from 'lucide-react';
+import { ArrowLeft, ChevronRight, LogIn, LogOut, Menu, Moon, Search, Sun, Bell, Shield } from 'lucide-react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useConsole } from './ConsoleContext';
 import { COMMAND_PORTAL_ADMIN_LOGIN_REQUIRED } from './portalFlags';
 import { ConsoleButton } from './components/ConsoleButton';
+import { FlashStack } from './components/FlashStack';
 import { displayWalletIdentity } from './identityConfig';
 import { StatusPill } from './components/StatusPill';
 import { cn } from '../lib/utils';
@@ -34,7 +35,10 @@ interface PortalShellProps {
 
 function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portalHomePath, defaultRedirect }: PortalShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => { try { return (localStorage.getItem('bharatkyc:theme') as 'dark' | 'light') || 'light'; } catch { return 'light'; } });
+  const [activityTrayOpen, setActivityTrayOpen] = useState(false);
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const [lastActivityAt, setLastActivityAt] = useState<number>(() => Date.now());
   const {
     authenticated,
     activeWalletUsername,
@@ -44,7 +48,45 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
     loginFi,
     logoutWallet,
     logoutFi,
+    flashMessages,
+    dismissFlashMessage,
   } = useConsole();
+
+  useEffect(() => { try { localStorage.setItem('bharatkyc:theme', theme); } catch {} }, [theme]);
+
+  useEffect(() => {
+    const onActivity = () => setLastActivityAt(Date.now());
+    window.addEventListener('click', onActivity);
+    window.addEventListener('keydown', onActivity);
+    window.addEventListener('mousemove', onActivity);
+    const timer = window.setInterval(() => {
+      if (Date.now() - lastActivityAt > 1000 * 60 * 12) setShowTimeoutWarning(true);
+    }, 15000);
+    return () => {
+      window.removeEventListener('click', onActivity);
+      window.removeEventListener('keydown', onActivity);
+      window.removeEventListener('mousemove', onActivity);
+      window.clearInterval(timer);
+    };
+  }, [lastActivityAt]);
+
+  const themeClasses = useMemo(() => theme === 'dark' ? ({
+    appBg: 'bg-[radial-gradient(circle_at_top_left,_#0f172a,_#0b122b_42%,_#1e293b_100%)] text-slate-100',
+    shellBorder: 'border-slate-700/80', shellBg: 'bg-[linear-gradient(160deg,#0a1026,#0e1638_62%,#0b122d)]',
+    headerBg: 'bg-[linear-gradient(120deg,rgba(15,23,42,0.96),rgba(30,41,59,0.95))] border-slate-700/80',
+    mainBg: 'bg-[linear-gradient(180deg,#0b122b,#111d43)]', searchWrap: 'border-slate-700 bg-slate-900/60 text-slate-200',
+    sideBg: 'border-slate-800/90 bg-[linear-gradient(180deg,#020617,#0f172a)] text-slate-100', sideCard: 'border-white/10 bg-white/[0.04]', sideBrand: 'border-white/10 bg-white/[0.07]'
+  }) : ({
+    appBg: 'bg-[#f3f5fb] text-slate-900', shellBorder: 'border-slate-200', shellBg: 'bg-white',
+    headerBg: 'bg-white border-slate-200', mainBg: 'bg-[#f8fafc]', searchWrap: 'border-slate-200 bg-white text-slate-800',
+    sideBg: 'border-slate-200 bg-[linear-gradient(180deg,#0b1326,#0f172a)] text-slate-100', sideCard: 'border-white/10 bg-white/[0.03]', sideBrand: 'border-white/10 bg-white/[0.06]'
+  }), [theme]);
+
+  const exportActivityJson = () => {
+    const payload = { portalType, generatedAt: new Date().toISOString(), sessionSummary, flashMessages };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `bharat-kyc-${portalType}-activity-${Date.now()}.json`; a.click(); URL.revokeObjectURL(url);
+  };
 
   const sessionSummary =
     portalType === 'fi'
@@ -64,31 +106,20 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
   const primaryIdentity = portalType === 'fi' ? activeFiUsername : activeWalletUsername;
 
   return (
-    <div className="min-h-screen bg-[#eef1f7] text-slate-800">
-      <div className={cn('mx-auto grid min-h-screen max-w-[1720px] grid-cols-1 gap-4 p-4 xl:gap-5 xl:p-5', desktopSidebarCollapsed ? 'xl:grid-cols-[96px_1fr]' : 'xl:grid-cols-[286px_1fr]')}>
-        <aside className="rounded-[28px] border border-slate-200/90 bg-[#f7f9fd] p-4 text-slate-800 shadow-[0_14px_30px_rgba(15,23,42,0.06)] xl:sticky xl:top-5 xl:h-[calc(100vh-2.5rem)] xl:overflow-y-auto">
-          <div className={cn('mb-4 rounded-2xl border border-slate-200 bg-white p-4', desktopSidebarCollapsed && 'xl:p-3')}>
-            <div className="flex items-center gap-2"><span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-sm ring-1 ring-blue-200">◎</span><div className={cn('min-w-0', desktopSidebarCollapsed && 'xl:hidden')}><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-600">Bharat KYC T</p><p className="text-[11px] text-slate-500">Enterprise Console</p></div></div>
-            <h1 className={cn('mt-2 text-lg font-semibold tracking-tight text-slate-900', desktopSidebarCollapsed && 'xl:hidden')}>{title}</h1>
-            <p className={cn('mt-2 text-xs leading-relaxed text-slate-600', desktopSidebarCollapsed && 'xl:hidden')}>{subtitle}</p>
+    <div data-kyc-theme={theme} className={cn('min-h-screen', themeClasses.appBg, theme === 'dark' ? 'kyc-shell-dark' : 'kyc-shell-light')}>
+      <FlashStack messages={flashMessages} onDismiss={dismissFlashMessage} />
+      <div className="mx-auto grid min-h-screen max-w-[1720px] grid-cols-1 gap-4 p-4 xl:grid-cols-[300px_1fr] xl:gap-5 xl:p-5">
+        <aside className={cn('rounded-3xl border p-4 text-slate-100 shadow-[0_24px_52px_rgba(15,23,42,0.42)] xl:sticky xl:top-5 xl:h-[calc(100vh-2.5rem)] xl:overflow-y-auto', themeClasses.sideBg)}>
+          <div className={cn('mb-4 rounded-2xl border p-4', themeClasses.sideBrand)}>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Bharat KYC T</p>
+            <h1 className="mt-1 text-lg font-semibold tracking-tight text-white">{title}</h1>
+            <p className="mt-2 text-xs leading-relaxed text-slate-300">{subtitle}</p>
           </div>
 
           <button
             type="button"
-            onClick={() => setDesktopSidebarCollapsed((v) => !v)}
-            className="mb-3 hidden w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 xl:inline-flex"
-          >
-            <span className="inline-flex items-center gap-2">
-              <Menu className="h-4 w-4" />
-              Sidebar
-            </span>
-            <span>{desktopSidebarCollapsed ? 'Expand' : 'Collapse'}</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setMobileNavOpen((value) => !value)}
-            className="mb-3 inline-flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 xl:hidden"
+            className="mb-3 inline-flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/[0.06] px-3 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/[0.1] xl:hidden"
           >
             <span className="inline-flex items-center gap-2">
               <Menu className="h-4 w-4" />
@@ -97,9 +128,9 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
             <span>{mobileNavOpen ? 'Hide' : 'Show'}</span>
           </button>
 
-          <div className={cn('space-y-3', mobileNavOpen ? 'block' : 'hidden xl:block', desktopSidebarCollapsed && 'xl:hidden')}>
-            <section className="rounded-2xl border border-slate-200 bg-white p-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">Pages</p>
+          <div className={cn('space-y-3', mobileNavOpen ? 'block' : 'hidden xl:block')}>
+            <section className={cn('rounded-2xl border p-3', themeClasses.sideCard)}>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Pages</p>
               <nav className="space-y-1">
                 {navItems.map((item) => (
                   <NavLink
@@ -108,14 +139,14 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
                     end={item.path === '/command' || item.path === '/wallet' || item.path === '/fi'}
                     className={({ isActive }) =>
                       cn(
-                        'group block rounded-2xl px-3 py-2.5 transition',
+                        'block rounded-xl px-3 py-2.5 transition',
                         isActive
-                          ? 'bg-[#eaf0ff] text-blue-700 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.12)]'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          ? 'bg-gradient-to-r from-blue-500/30 to-cyan-400/20 text-white ring-1 ring-blue-300/40'
+                          : 'text-slate-300 hover:bg-white/10 hover:text-white'
                       )
                     }
                   >
-                    <div className="flex items-center gap-2"><span className="inline-flex h-2 w-2 rounded-full bg-current opacity-60 group-hover:opacity-100" /><p className="text-sm font-semibold">{item.label}</p></div>
+                    <p className="text-sm font-semibold">{item.label}</p>
                     <p className="text-xs opacity-80">{item.description}</p>
                   </NavLink>
                 ))}
@@ -123,24 +154,24 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
             </section>
 
             {quickLinks.length > 0 ? (
-              <section className="rounded-2xl border border-slate-200 bg-white p-3">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">Quick Panels</p>
+              <section className={cn('rounded-2xl border p-3', themeClasses.sideCard)}>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Quick Panels</p>
                 <div className="space-y-1.5">
                   {quickLinks.map((item) => (
-                    <Link key={item.path} to={item.path} className="group block rounded-xl border border-slate-200 bg-[#fafbff] px-3 py-2 hover:bg-white/[0.08]">
+                    <Link key={item.path} to={item.path} className="group block rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 hover:bg-white/[0.08]">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-semibold text-slate-900">{item.label}</p>
-                        <ChevronRight className="h-3.5 w-3.5 text-slate-500 group-hover:text-slate-700" />
+                        <p className="text-xs font-semibold text-white">{item.label}</p>
+                        <ChevronRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-white" />
                       </div>
-                      <p className="mt-0.5 text-[11px] text-slate-600">{item.description}</p>
+                      <p className="mt-0.5 text-[11px] text-slate-300">{item.description}</p>
                     </Link>
                   ))}
                 </div>
               </section>
             ) : null}
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">Session</p>
+            <section className={cn('rounded-2xl border p-3', themeClasses.sideCard)}>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Session</p>
               <div className="space-y-2">
                 <StatusPill
                   status={
@@ -205,17 +236,22 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
               </div>
             </section>
 
-            <div className="border-t border-slate-200 pt-3">
+            <div className="border-t border-white/10 pt-3">
+              <div className="mb-2 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                <span className="text-xs font-semibold text-slate-200">Theme</span>
+                <button type="button" onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.08] px-2 py-1 text-[11px] font-semibold text-white">{theme === 'dark' ? <Sun className="h-3 w-3" /> : <Moon className="h-3 w-3" />}{theme === 'dark' ? 'Light' : 'Dark'}</button>
+              </div>
+
               <Link
                 to="/login"
-                className="mb-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:underline"
+                className="mb-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-300 hover:text-white hover:underline"
               >
                 Switch Portal
               </Link>
               <br />
               <Link
                 to={portalHomePath}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:underline"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-300 hover:text-white hover:underline"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Portal Home
@@ -224,49 +260,35 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
           </div>
         </aside>
 
-        <div className="flex min-h-[65vh] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_16px_30px_rgba(15,23,42,0.08)] xl:h-[calc(100vh-2.5rem)] xl:min-h-0">
-          <header className="border-b border-slate-200 bg-gradient-to-b from-[#f9fbff] to-[#f6f9ff] px-6 py-4">
-            <div className="mb-3 flex flex-wrap items-center gap-3">
-              <div className="relative min-w-[210px] flex-1 sm:min-w-[320px] max-w-[520px]">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div className={cn('flex min-h-[65vh] flex-col overflow-hidden rounded-3xl border shadow-[0_24px_52px_rgba(15,23,42,0.16)] backdrop-blur xl:h-[calc(100vh-2.5rem)] xl:min-h-0', themeClasses.shellBorder, themeClasses.shellBg)}>
+          <header className={cn('border-b px-6 py-4', themeClasses.headerBg)}>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[170px] flex-1 sm:min-w-[240px]">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <input
                   type="text"
-                  placeholder="Search portal modules, users, tokens..."
-                  className="h-11 w-full rounded-full border border-slate-200 bg-white px-10 pr-12 text-sm text-slate-700 shadow-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  placeholder="Search views, IDs, consent, token..."
+                  className={cn('h-9 w-full rounded-lg border px-8 text-sm outline-none focus:border-violet-400', themeClasses.searchWrap)}
                 />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">/</span>
               </div>
-              <div className="ml-auto flex items-center gap-2">
-                <button type="button" className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50">
-                  <Bell className="h-4 w-4" />
-                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
-                </button>
-                <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50">
-                  <Mail className="h-4 w-4" />
-                </button>
-                <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50">
-                  <Settings className="h-4 w-4" />
-                </button>
-                <div className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
-                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 shadow-sm">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-700">{(displayWalletIdentity(primaryIdentity, 'operator') || 'OP').slice(0,2).toUpperCase()}</span>
-                  <div className="hidden text-left sm:block">
-                    <p className="text-xs font-semibold leading-tight text-slate-800">{displayWalletIdentity(primaryIdentity, 'operator')}</p>
-                    <p className="text-[11px] leading-tight text-slate-500">{portalType === 'command' ? 'Command workspace' : portalType === 'wallet' ? 'Wallet workspace' : 'FI workspace'}</p>
-                  </div>
-                  <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                </div>
+              <div className="rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-1.5 text-right">
+                <p className="text-xs font-semibold text-slate-100">{displayWalletIdentity(primaryIdentity, 'operator')}</p>
+                <p className="text-[11px] text-slate-400">
+                  {portalType === 'command' ? 'Command workspace' : portalType === 'wallet' ? 'Wallet workspace' : 'FI workspace'}
+                </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-600">Portal Workspace</p>
-                <h2 className="mt-0.5 text-2xl font-semibold tracking-tight text-slate-900">{title}</h2>
-                <p className="text-sm text-slate-600/95">{subtitle}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Portal Workspace</p>
+                <h2 className="mt-0.5 text-2xl font-semibold tracking-tight text-white">{title}</h2>
+                <p className="text-sm text-slate-300/95">{subtitle}</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => setActivityTrayOpen(true)} className={cn('inline-flex h-9 w-9 items-center justify-center rounded-xl border', theme==='dark' ? 'border-slate-700 bg-slate-900/60 text-slate-200' : 'border-slate-200 bg-white text-slate-700')} title="Activity tray"><Bell className="h-4 w-4" /></button>
+                <button type="button" onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} className={cn('inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-sm', theme==='dark' ? 'border-slate-700 bg-slate-900/60 text-slate-200' : 'border-slate-200 bg-white text-slate-700')} title="Toggle theme">{theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}{theme === 'dark' ? 'Light' : 'Dark'}</button>
                 <StatusPill status="ok" label="Auth: Keycloak" />
                 <StatusPill
                   status={
@@ -290,18 +312,58 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto bg-[#f4f7fc] p-4 sm:p-6">
+          <main className={cn('flex-1 overflow-y-auto p-4 sm:p-6', themeClasses.mainBg)}>
             <Outlet />
           </main>
         </div>
       </div>
+      {showTimeoutWarning ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="mb-3 flex items-center gap-2 text-slate-900"><Shield className="h-5 w-5 text-violet-600" /><h3 className="text-lg font-semibold">Session timeout warning</h3></div>
+            <p className="text-sm text-slate-600">Your session appears idle. Extend session to continue securely, or sign out.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => { setShowTimeoutWarning(false); setLastActivityAt(Date.now()); if (portalType==='fi') { void logoutFi('/fi/login'); } else if (portalType==='wallet') { void logoutWallet('/wallet/login'); } else if (COMMAND_PORTAL_ADMIN_LOGIN_REQUIRED) { void logoutWallet('/command/login'); } }} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">Sign out</button>
+              <button type="button" onClick={() => { setShowTimeoutWarning(false); setLastActivityAt(Date.now()); }} className="rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white">Extend session</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {activityTrayOpen ? (
+        <div className="fixed inset-0 z-40">
+          <button type="button" className="absolute inset-0 bg-slate-950/40" onClick={() => setActivityTrayOpen(false)} aria-label="Close activity tray" />
+          <aside className="absolute right-0 top-0 h-full w-full max-w-md border-l border-slate-200 bg-white p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-900">Activity & Audit Tray</h3>
+              <div className="flex gap-2">
+                <button type="button" onClick={exportActivityJson} className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">Export JSON</button>
+                <button type="button" onClick={() => setActivityTrayOpen(false)} className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">Close</button>
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+              <p><span className="font-semibold">Portal:</span> {portalType}</p>
+              <p><span className="font-semibold">Session:</span> {sessionSummary}</p>
+              <p><span className="font-semibold">Theme:</span> {theme}</p>
+            </div>
+            <div className="mt-3 space-y-2 overflow-y-auto pb-10" style={{maxHeight:'calc(100vh - 170px)'}}>
+              {(flashMessages?.length ? flashMessages : [{ id: 'no-events', title: 'No recent flash events', body: 'Operational events and confirmations will appear here.' } as any]).map((m: any) => (
+                <div key={m.id} className="rounded-xl border border-slate-200 p-3">
+                  <p className="text-sm font-semibold text-slate-900">{m.title || m.kind || 'Activity event'}</p>
+                  <p className="mt-1 text-xs text-slate-600">{m.body || m.message || 'No additional details available.'}</p>
+                </div>
+              ))}
+            </div>
+          </aside>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 const walletNavItems: PortalNavItem[] = [
   { label: 'Home', path: '/wallet', description: 'Wallet overview and counters' },
-  { label: 'Request Queue', path: '/wallet/inbox', description: 'Pending requests (self + delegated)' },
+  { label: 'Consent Inbox', path: '/wallet/inbox', description: 'Pending requests (self + delegated)' },
   { label: 'Consent History', path: '/wallet/history', description: 'Approved, rejected, expired consents' },
   { label: 'Nominees', path: '/wallet/nominees', description: 'Create/disable nominees' },
   { label: 'Delegations', path: '/wallet/delegations', description: 'Delegations created from nominees' },
@@ -330,14 +392,6 @@ const commandNavItems: PortalNavItem[] = [
 ];
 
 const commandQuickLinks: PortalQuickLink[] = [];
-/* quick panel removed per UX request
-[
-  { label: 'Operations Board', path: '/command/operations', description: 'KPI, health, coverage and onboarding' },
-  { label: 'Scenario Suite', path: '/command/scenario', description: 'Run guided end-to-end flows' },
-  { label: 'Integrations', path: '/command/integrations', description: 'Check readiness of adapters and services' },
-  { label: 'Audit Timeline', path: '/command/audit', description: 'Jump to full request/response trail' },
-];
-*/
 
 export function WalletPortalLayout() {
   return (

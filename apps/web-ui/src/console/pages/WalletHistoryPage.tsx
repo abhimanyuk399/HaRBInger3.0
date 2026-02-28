@@ -4,9 +4,20 @@ import { ConsoleCard } from '../components/ConsoleCard';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime, truncate } from '../utils';
-import { TableSearchPager, usePagedFilter } from '../components/TableSearchPager';
+import { ConfirmActionDialog } from '../components/ConfirmActionDialog';
+import { EmptyState, TableLoadingSkeleton } from '../components/FeedbackStates';
 
 type Row = Record<string, unknown>;
+
+function downloadJson(filename: string, payload: unknown) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function statusLabel(status: string) {
   const normalized = status.toUpperCase();
@@ -21,9 +32,15 @@ function statusLabel(status: string) {
 export default function WalletHistoryPage() {
   const { walletConsents, refreshWalletConsents, activeWalletUsername, revokeConsent } = useConsole();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [confirmRevokeOpen, setConfirmRevokeOpen] = useState(false);
+  const [revokeBusy, setRevokeBusy] = useState(false);
 
   useEffect(() => {
-    void refreshWalletConsents();
+    let mounted = true;
+    setLoading(true);
+    void refreshWalletConsents().finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
   }, [refreshWalletConsents]);
 
   const history = useMemo(() => {
@@ -32,8 +49,6 @@ export default function WalletHistoryPage() {
       .filter((c) => String(c.lifecycleStatus ?? c.status ?? '').toUpperCase() !== 'PENDING')
       .sort((a, b) => String(b.updatedAt ?? b.createdAt ?? '').localeCompare(String(a.updatedAt ?? a.createdAt ?? '')));
   }, [walletConsents]);
-
-  const historyTable = usePagedFilter(history, { pageSize: 10, match: (row, q) => [String(row.id ?? row.consentId ?? ''), String(row.fiId ?? ''), String(row.purpose ?? ''), String(row.subjectUserId ?? ''), String(row.actedByUserId ?? ''), String(row.status ?? row.lifecycleStatus ?? '')].join(' ').toLowerCase().includes(q) });
 
   const selected = useMemo(() => {
     const id = selectedId ?? (history[0] ? String(history[0].id ?? history[0].consentId ?? '') : null);
@@ -51,10 +66,13 @@ export default function WalletHistoryPage() {
     <div className="space-y-4">
       <PortalPageHeader title="Consent History" subtitle="Historical consents with status, FI, purpose, and delegation context." />
 
+      <div className="flex justify-end">
+        <button type="button" onClick={() => downloadJson(`wallet-consent-history-${activeWalletUsername ?? "user"}.json`, { exportedAt: new Date().toISOString(), viewer: activeWalletUsername, records: history })} disabled={loading || history.length === 0} className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Export JSON</button>
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <ConsoleCard>
-          <TableSearchPager {...historyTable} placeholder="Search service / label / status" />
-          <div className="overflow-x-auto">
+          {loading ? <TableLoadingSkeleton rows={6} cols={6} /> : <div className="overflow-x-auto">
             <table className="min-w-full text-left text-xs text-slate-700">
               <thead className="text-[11px] uppercase tracking-wide text-slate-500">
                 <tr>
@@ -67,14 +85,14 @@ export default function WalletHistoryPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {historyTable.paged.length === 0 ? (
+                {history.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-3 py-4 text-slate-500">
-                      No historical consents.
+No historical consents. Approved/rejected/revoked/expired records will appear here.
                     </td>
                   </tr>
                 ) : (
-                  historyTable.paged.map((row) => {
+                  history.map((row) => {
                     const id = String(row.id ?? row.consentId ?? '');
                     const status = String(row.lifecycleStatus ?? row.status ?? '');
                     const meta = statusLabel(status);
@@ -100,14 +118,14 @@ export default function WalletHistoryPage() {
                 )}
               </tbody>
             </table>
-          </div>
+          </div>}
         </ConsoleCard>
 
         <ConsoleCard>
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected Record</p>
             {!selected ? (
-              <p className="text-sm text-slate-600">Select a consent from history.</p>
+              loading ? <TableLoadingSkeleton rows={3} cols={1} /> : <EmptyState title="Select a consent from history" description="Choose a record from the left table to inspect raw details and lifecycle metadata." />
             ) : (
               <>
                 <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-700">
@@ -127,10 +145,7 @@ export default function WalletHistoryPage() {
                     onClick={async () => {
                       const consentId = String(selected.id ?? selected.consentId ?? '');
                       if (!consentId) return;
-                      const ok = window.confirm('Revoke this approved consent? This will immediately block reuse by FI.');
-                      if (!ok) return;
-                      await revokeConsent(consentId, 'Revoked from Wallet History');
-                      await refreshWalletConsents();
+                      setConfirmRevokeOpen(true);
                     }}
                   >
                     Revoke consent
@@ -148,6 +163,28 @@ export default function WalletHistoryPage() {
           </div>
         </ConsoleCard>
       </div>
+
+      <ConfirmActionDialog
+        open={confirmRevokeOpen && !!selected}
+        title="Revoke approved consent"
+        message={<>This will immediately block FI reuse for <span className="font-semibold">{String(selected?.fiId ?? '-')}</span> and update lifecycle status to <span className="font-semibold">REVOKED</span>.</>}
+        confirmLabel="Confirm revoke"
+        confirmTone="danger"
+        busy={revokeBusy}
+        onCancel={() => setConfirmRevokeOpen(false)}
+        onConfirm={async () => {
+          const consentId = String(selected?.id ?? selected?.consentId ?? '');
+          if (!consentId) return;
+          setRevokeBusy(true);
+          try {
+            await revokeConsent(consentId, 'Revoked from Wallet History');
+            await refreshWalletConsents();
+            setConfirmRevokeOpen(false);
+          } finally {
+            setRevokeBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }
