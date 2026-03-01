@@ -11,7 +11,7 @@ interface WalletAuthOptionalBannerProps {
 export function WalletAuthOptionalBanner({
   open,
   onDismiss,
-  walletPath = '/wallet/ops',
+  walletPath = '/wallet',
   title = 'Wallet authentication (optional for demo)',
 }: WalletAuthOptionalBannerProps) {
   if (!open) {

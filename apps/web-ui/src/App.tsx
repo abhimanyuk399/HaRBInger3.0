@@ -14,6 +14,7 @@ import WalletInboxPage from './console/pages/WalletInboxPage';
 import WalletHistoryPage from './console/pages/WalletHistoryPage';
 import WalletNomineesPage from './console/pages/WalletNomineesPage';
 import WalletDelegationsPage from './console/pages/WalletDelegationsPage';
+import WalletTimelinePage from './console/pages/WalletTimelinePage';
 import FiHomePage from './console/pages/FiHomePage';
 import CommandHomePage from './console/pages/CommandHomePage';
 import PortalLoginPage from './console/pages/PortalLoginPage';
@@ -119,8 +120,9 @@ export default function App() {
             <Route path="history" element={<WalletHistoryPage />} />
             <Route path="nominees" element={<WalletNomineesPage />} />
             <Route path="delegations" element={<WalletDelegationsPage />} />
-            <Route path="ops" element={<WalletOpsPage mode="consents" />} />
-            <Route path="delegation" element={<WalletOpsPage mode="delegation" />} />
+            <Route path="timeline" element={<WalletTimelinePage />} />
+            <Route path="ops" element={<Navigate to="/wallet/inbox" replace />} />
+            <Route path="delegation" element={<Navigate to="/wallet/delegations" replace />} />
           </Route>
         </Route>
 

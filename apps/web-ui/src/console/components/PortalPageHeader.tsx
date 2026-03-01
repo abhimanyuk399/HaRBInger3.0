@@ -32,13 +32,15 @@ export function PortalPageHeader({
       />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Operations</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Secure Banking Console</p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">{title}</h1>
           <p className="mt-1 text-sm text-slate-600/95">{subtitle}</p>
         </div>
         {actions}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="kyc-theme-chip is-info">HaRBInger 2025</span>
+        <span className="kyc-theme-chip is-ok">Identity • Integrity • Inclusivity</span>
         <StatusPill status="neutral" label={`Env: ${environmentLabel}`} />
         <StatusPill status="neutral" label={`Last refresh: ${formatDateTime(lastRefreshAt ?? new Date().toISOString())}`} />
         {badges}

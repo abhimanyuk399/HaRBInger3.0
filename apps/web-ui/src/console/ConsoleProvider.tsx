@@ -968,9 +968,28 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
     walletRoleClaimSet.has('wallet_user') || adminRoleGranted || (walletRoleGranted && !hasWalletNomineeRole);
   const authenticated = Boolean(walletKeycloak.authenticated || walletDirectSession);
   const activeWalletUsername = keycloakWalletUsername;
+  const resolveWalletApiTargetUserId = useCallback(
+    (preferredTargetUserId?: string) => {
+      if (typeof preferredTargetUserId === 'string' && preferredTargetUserId.trim().length > 0) {
+        return preferredTargetUserId.trim();
+      }
+      const username = (activeWalletUsername ?? '').trim().toLowerCase();
+      if (username && username === WALLET_OWNER_USERNAME.toLowerCase()) {
+        return WALLET_OWNER_USER_ID;
+      }
+      if (username && username === WALLET_NOMINEE_USERNAME.toLowerCase()) {
+        return WALLET_NOMINEE_USER_ID || WALLET_NOMINEE_USERNAME;
+      }
+      if (activeWalletUsername && activeWalletUsername.trim().length > 0) {
+        return activeWalletUsername.trim();
+      }
+      return WALLET_OWNER_USER_ID;
+    },
+    [activeWalletUsername]
+  );
   const fiAuthenticated = Boolean(fiKeycloak.authenticated || fiDirectSession);
   const activeFiUsername = fiAuthenticated ? keycloakFiUsername : null;
-  const defaultPortalPath = adminRoleGranted ? '/command' : walletRoleGranted ? '/wallet/ops' : fiRoleGranted ? '/fi/queue' : '/command';
+  const defaultPortalPath = adminRoleGranted ? '/command' : walletRoleGranted ? '/wallet' : fiRoleGranted ? '/fi/queue' : '/command';
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -1502,7 +1521,7 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
 
   const fetchWalletTokensWithToken = useCallback(
     async (walletToken: string | null, targetUserId?: string) => {
-      const userId = targetUserId?.trim() || WALLET_OWNER_USER_ID;
+      const userId = resolveWalletApiTargetUserId(targetUserId);
       const listed = await apiCall<{ userId?: string; tokens?: WalletTokenView[]; items?: WalletTokenView[] }>({
         service: 'wallet',
         title: 'List Wallet Tokens',
@@ -1514,12 +1533,12 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
       setWalletTokens(tokens);
       return tokens;
     },
-    [apiCall]
+    [apiCall, resolveWalletApiTargetUserId]
   );
 
   const fetchWalletConsentsWithToken = useCallback(
     async (walletToken: string | null, targetUserId?: string) => {
-      const userId = targetUserId?.trim() || WALLET_OWNER_USER_ID;
+      const userId = resolveWalletApiTargetUserId(targetUserId);
       const listed = await apiCall<{ userId?: string; consents?: WalletConsentView[]; items?: WalletConsentView[] }>({
         service: 'wallet',
         title: 'List Wallet Consents',
@@ -1532,12 +1551,12 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
       setWalletConsents(consents);
       return consents;
     },
-    [apiCall]
+    [apiCall, resolveWalletApiTargetUserId]
   );
 
   const fetchDelegationsWithToken = useCallback(
     async (walletToken: string | null, targetUserId?: string) => {
-      const userId = targetUserId?.trim() || WALLET_OWNER_USER_ID;
+      const userId = resolveWalletApiTargetUserId(targetUserId);
       const listed = await apiCall<{ userId: string; delegations: DelegationRecord[] }>({
         service: 'wallet',
         title: 'List Delegations',
@@ -1548,12 +1567,12 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
       setDelegations(listed.delegations);
       return listed.delegations;
     },
-    [apiCall]
+    [apiCall, resolveWalletApiTargetUserId]
   );
 
   const fetchNomineesWithToken = useCallback(
     async (walletToken: string | null, targetUserId?: string) => {
-      const userId = targetUserId?.trim() || WALLET_OWNER_USER_ID;
+      const userId = resolveWalletApiTargetUserId(targetUserId);
       const listed = await apiCall<{ userId: string; nominees: NomineeRecord[] }>({
         service: 'wallet',
         title: 'List Nominees',
@@ -1564,7 +1583,7 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
       setNominees(Array.isArray(listed.nominees) ? listed.nominees : []);
       return listed.nominees;
     },
-    [apiCall]
+    [apiCall, resolveWalletApiTargetUserId]
   );
 
   const approveConsent = useCallback(
@@ -2423,7 +2442,7 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
           options?.allowedFields && options.allowedFields.length > 0 ? options.allowedFields : scenario.requestedFields;
         const expiresAt = options?.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-        const ownerUserId = options?.ownerUserId?.trim() || WALLET_OWNER_USER_ID;
+        const ownerUserId = resolveWalletApiTargetUserId(options?.ownerUserId);
         const createdDelegation = await apiCall<DelegationRecord>({
           service: 'wallet',
           title: 'Create Delegation',
@@ -2457,7 +2476,7 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
         setRunningAction(null);
       }
     },
-    [apiCall, fetchDelegationsWithToken, hasWalletOwnerRole, pushActivity, requireWalletToken, scenario.purpose, scenario.requestedFields]
+    [apiCall, fetchDelegationsWithToken, hasWalletOwnerRole, pushActivity, requireWalletToken, resolveWalletApiTargetUserId, scenario.purpose, scenario.requestedFields]
   );
 
   const revokeDelegation = useCallback(
@@ -2832,7 +2851,7 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
 
   const loginWallet = useCallback(
     async (usernameHint?: string, redirectPath?: string) => {
-      const safeRedirect = typeof redirectPath === 'string' && redirectPath.trim().length > 0 ? redirectPath : '/wallet/ops';
+      const safeRedirect = typeof redirectPath === 'string' && redirectPath.trim().length > 0 ? redirectPath : '/wallet';
       await initWalletKeycloak();
       await walletKeycloak.login({
         redirectUri: `${window.location.origin}${safeRedirect.startsWith('/') ? safeRedirect : `/${safeRedirect}`}`,

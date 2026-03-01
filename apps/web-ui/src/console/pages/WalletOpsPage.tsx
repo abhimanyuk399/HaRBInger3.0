@@ -217,6 +217,8 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
   const fiPortalPath = isWalletPortalRoute ? '/fi/queue' : '/fi/queue';
   const auditPath = '/command/audit';
   const demoBypassWalletLogin = DEMO_BYPASS_WALLET_LOGIN;
+  const showDashboardCard = false;
+  const showInboxCard = false;
 
   const [selectedConsentId, setSelectedConsentId] = useState<string | null>(resolveConsentId(walletConsents[0] ?? null));
   const [consentFilter, setConsentFilter] = useState<ConsentFilter>('all');
@@ -300,12 +302,19 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
   }, [location.pathname]);
 
   useEffect(() => {
-    void Promise.allSettled([
+    const isNomineeSession =
+      typeof activeWalletUsername === 'string' &&
+      activeWalletUsername.trim().toLowerCase() === WALLET_NOMINEE_USERNAME.toLowerCase();
+
+    const tasks: Array<Promise<unknown>> = [
       refreshWalletConsents(resolvedWalletUserId),
-      refreshDelegations(resolvedWalletUserId),
       refreshWalletTokens(resolvedWalletUserId),
-    ]);
-  }, [refreshDelegations, refreshWalletConsents, refreshWalletTokens, resolvedWalletUserId]);
+    ];
+    if (!isNomineeSession) {
+      tasks.push(refreshDelegations(resolvedWalletUserId));
+    }
+    void Promise.allSettled(tasks);
+  }, [activeWalletUsername, refreshDelegations, refreshWalletConsents, refreshWalletTokens, resolvedWalletUserId]);
 
   const consentCounts = useMemo(() => {
     const counts = { PENDING: 0, APPROVED: 0, REJECTED: 0, UNKNOWN: 0 };
@@ -383,6 +392,7 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
   const authFailure = useMemo(
     () =>
       failures.find((failure) => {
+        if (String(failure.errorCode ?? '').toLowerCase() === 'owner_authorization_required') return false;
         if (failure.statusCode === 401) return true;
         if (
           failure.errorCode === 'LOGIN_REQUIRED' ||
@@ -826,7 +836,8 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.08fr_1.18fr]">
+      <div className={`grid gap-4 ${showDashboardCard && showInboxCard ? 'xl:grid-cols-[0.95fr_1.08fr_1.18fr]' : 'xl:grid-cols-[1.2fr_1.2fr]'}`}>
+        {showDashboardCard ? (
         <ConsoleCard id="wallet-dashboard" className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))]">
           <SectionHeader title="Wallet Dashboard" subtitle="Read-only insights for consent and token status." />
           <div className="grid gap-2 sm:grid-cols-3">
@@ -928,9 +939,30 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
             </div>
           </div>
         </ConsoleCard>
+        ) : null}
+
+        {!showDashboardCard ? (
+          <ConsoleCard id="wallet-ops-home-shortcuts" className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))]">
+            <SectionHeader title="Wallet Operations" subtitle="Dashboard, token status, and aggregate counts are now on Wallet Home." />
+            <div className="space-y-3 text-sm text-slate-700">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="font-medium text-slate-900">Use Wallet Home for status & counts</p>
+                <p className="mt-1 text-xs text-slate-600">Token status, pending/approved/rejected counts, and summary cards have been moved to the Home page.</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Link to="/wallet" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">Open Wallet Home</Link>
+                  <Link to="/wallet/inbox" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">Open Consent Inbox</Link>
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                This page is now focused on consent actions, delegation operations, and troubleshooting.
+              </div>
+            </div>
+          </ConsoleCard>
+        ) : null}
 
         {showConsentSections ? (
           <>
+        {showInboxCard ? (
         <ConsoleCard id="consent-inbox" className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,250,251,0.94))]">
           <SectionHeader
             title="Consent Inbox"
@@ -1071,6 +1103,18 @@ export default function WalletOpsPage({ mode = 'all' }: WalletOpsPageProps) {
             )}
           </div>
         </ConsoleCard>
+        ) : null}
+
+        {!showInboxCard ? (
+          <ConsoleCard id="consent-inbox-redirect" className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,250,251,0.94))]">
+            <SectionHeader title="Consent Inbox moved" subtitle="Use the dedicated Consent Inbox page for request listing and selection." />
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <p className="font-medium text-slate-900">Open /wallet/inbox to browse, filter, and select consent requests.</p>
+              <p className="mt-1 text-xs text-slate-600">Operations page keeps the action workspace and delegation controls to reduce duplication.</p>
+              <Link to="/wallet/inbox" className="mt-3 inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">Go to Consent Inbox</Link>
+            </div>
+          </ConsoleCard>
+        ) : null}
 
         <ConsoleCard id="consent-actions" className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))]">
           <SectionHeader

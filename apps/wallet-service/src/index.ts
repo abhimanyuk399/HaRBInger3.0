@@ -36,6 +36,45 @@ const issuerAdminClientId = process.env.ISSUER_ADMIN_CLIENT_ID ?? 'issuer-admin'
 const issuerAdminClientSecret = (process.env.ISSUER_ADMIN_CLIENT_SECRET ?? '').trim();
 const walletOwnerUsername = (process.env.KEYCLOAK_WALLET_OWNER_USER ?? '').trim();
 const walletOwnerUserId = (process.env.KEYCLOAK_WALLET_OWNER_USER_ID ?? process.env.VITE_WALLET_OWNER_USER_ID ?? '').trim();
+const walletOwnerAliases = new Set(
+  [
+    process.env.KEYCLOAK_WALLET_OWNER_USER,
+    process.env.VITE_WALLET_OWNER_USERNAME,
+    process.env.VITE_WALLET_OWNER_ALIAS,
+    process.env.VITE_WALLET_OWNER_DISPLAY,
+    walletOwnerUserId,
+  ]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean)
+);
+const walletNomineeUsername = (process.env.KEYCLOAK_NOMINEE_USER ?? process.env.VITE_WALLET_NOMINEE_USERNAME ?? '').trim();
+const walletNomineeUserId = (process.env.KEYCLOAK_NOMINEE_USER_ID ?? process.env.VITE_WALLET_NOMINEE_USER_ID ?? '').trim();
+const walletNomineeAliases = new Set(
+  [
+    walletNomineeUsername,
+    process.env.VITE_WALLET_NOMINEE_ALIAS,
+    process.env.VITE_WALLET_NOMINEE_DISPLAY,
+    walletNomineeUserId,
+  ]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean)
+);
+
+function canonicalizeKnownWalletUserId(userId: string): string {
+  const normalized = userId.trim();
+  if (!normalized) return normalized;
+  if (walletOwnerUserId && walletOwnerAliases.has(normalized)) {
+    return walletOwnerUserId;
+  }
+  if (walletNomineeUserId && walletNomineeAliases.has(normalized)) {
+    return walletNomineeUserId;
+  }
+  return normalized;
+}
+
+function sameWalletIdentity(left: string, right: string): boolean {
+  return canonicalizeKnownWalletUserId(left) === canonicalizeKnownWalletUserId(right);
+}
 
 const validateAccessToken = createOidcValidator({
   issuerUrl: keycloakIssuerUrl,
@@ -155,7 +194,7 @@ function resolveActorUserId(req: express.Request): string | null {
 
   const explicitUserId = payload.user_id;
   if (typeof explicitUserId === 'string' && explicitUserId.trim().length > 0) {
-    return explicitUserId;
+    return canonicalizeKnownWalletUserId(explicitUserId);
   }
 
   const preferredUsername = payload.preferred_username;
@@ -163,12 +202,12 @@ function resolveActorUserId(req: express.Request): string | null {
     if (walletOwnerUsername && walletOwnerUserId && preferredUsername === walletOwnerUsername) {
       return walletOwnerUserId;
     }
-    return preferredUsername;
+    return canonicalizeKnownWalletUserId(preferredUsername);
   }
 
   const subject = payload.sub;
   if (typeof subject === 'string' && subject.trim().length > 0) {
-    return subject;
+    return canonicalizeKnownWalletUserId(subject);
   }
 
   return null;
@@ -286,7 +325,7 @@ app.post(
     if (!actorUserId) {
       return res.status(401).json({ error: 'actor_user_not_resolved' });
     }
-    if (actorUserId !== req.params.userId) {
+    if (!sameWalletIdentity(actorUserId, req.params.userId)) {
       return res.status(403).json({ error: 'wallet_user_mismatch' });
     }
 
@@ -359,7 +398,7 @@ app.get(
     if (!actorUserId) {
       return res.status(401).json({ error: 'actor_user_not_resolved' });
     }
-    if (actorUserId !== req.params.userId) {
+    if (!sameWalletIdentity(actorUserId, req.params.userId)) {
       return res.status(403).json({ error: 'wallet_user_mismatch' });
     }
 
@@ -392,7 +431,7 @@ app.post(
     if (!actorUserId) {
       return res.status(401).json({ error: 'actor_user_not_resolved' });
     }
-    if (actorUserId !== req.params.userId) {
+    if (!sameWalletIdentity(actorUserId, req.params.userId)) {
       return res.status(403).json({ error: 'wallet_user_mismatch' });
     }
 
@@ -473,7 +512,7 @@ app.get(
     if (!actorUserId) {
       return res.status(401).json({ error: 'actor_user_not_resolved' });
     }
-    if (actorUserId !== req.params.userId) {
+    if (!sameWalletIdentity(actorUserId, req.params.userId)) {
       return res.status(403).json({ error: 'wallet_user_mismatch' });
     }
 
@@ -640,7 +679,7 @@ app.get(
     if (!actorUserId) {
       return res.status(401).json({ error: 'actor_user_not_resolved' });
     }
-    if (actorUserId !== req.params.userId) {
+    if (!sameWalletIdentity(actorUserId, req.params.userId)) {
       return res.status(403).json({ error: 'owner_authorization_required' });
     }
 
@@ -673,7 +712,7 @@ app.post(
     if (!actorUserId) {
       return res.status(401).json({ error: 'actor_user_not_resolved' });
     }
-    if (actorUserId !== req.params.userId) {
+    if (!sameWalletIdentity(actorUserId, req.params.userId)) {
       return res.status(403).json({ error: 'owner_authorization_required' });
     }
 
@@ -728,7 +767,7 @@ app.post(
     if (!actorUserId) {
       return res.status(401).json({ error: 'actor_user_not_resolved' });
     }
-    if (actorUserId !== req.params.userId) {
+    if (!sameWalletIdentity(actorUserId, req.params.userId)) {
       return res.status(403).json({ error: 'owner_authorization_required' });
     }
 
@@ -768,7 +807,7 @@ app.post(
     if (!actorUserId) {
       return res.status(401).json({ error: 'actor_user_not_resolved' });
     }
-    if (actorUserId !== req.params.userId) {
+    if (!sameWalletIdentity(actorUserId, req.params.userId)) {
       return res.status(403).json({ error: 'owner_authorization_required' });
     }
 
@@ -909,7 +948,7 @@ app.get(
     if (!actorUserId) {
       return res.status(401).json({ error: 'actor_user_not_resolved' });
     }
-    if (actorUserId !== req.params.userId) {
+    if (!sameWalletIdentity(actorUserId, req.params.userId)) {
       return res.status(403).json({ error: 'owner_authorization_required' });
     }
 
@@ -969,8 +1008,9 @@ app.post(
       return res.status(404).json({ error: 'delegation_not_found' });
     }
 
-    const actorRefHash = computeUserRefHashFromIdentifier(actorUserId);
-    if (actorRefHash !== delegation.ownerRefHash) {
+    const actorRefHash = computeUserRefHashFromIdentifier(canonicalizeKnownWalletUserId(actorUserId));
+    const delegationOwnerRefHash = computeUserRefHashFromIdentifier(canonicalizeKnownWalletUserId(delegation.ownerUserId));
+    if (actorRefHash !== delegationOwnerRefHash) {
       return res.status(403).json({ error: 'owner_authorization_required' });
     }
 

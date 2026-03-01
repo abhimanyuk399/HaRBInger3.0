@@ -28,6 +28,8 @@ export const WALLET_NOMINEE_USERNAME =
 export const WALLET_NOMINEE_ALIAS =
   readEnv(import.meta.env.VITE_WALLET_NOMINEE_ALIAS, import.meta.env.VITE_WALLET_NOMINEE_DISPLAY, 'wallet-nominee-1') ??
   'wallet-nominee-1';
+export const WALLET_NOMINEE_USER_ID =
+  readEnv(import.meta.env.VITE_WALLET_NOMINEE_USER_ID, 'wallet-nominee-1') ?? 'wallet-nominee-1';
 
 export const FI_CLIENT_ID = readEnv(import.meta.env.VITE_FI_CLIENT_ID, 'fi-client') ?? 'fi-client';
 export const FI2_CLIENT_ID = readEnv(import.meta.env.VITE_FI2_CLIENT_ID, 'fi-client-2') ?? 'fi-client-2';
@@ -43,6 +45,7 @@ export const FI_OPTIONS = [
 export const KNOWN_WALLET_TARGETS = [
   { username: WALLET_OWNER_USERNAME, userId: WALLET_OWNER_USER_ID, label: `${WALLET_OWNER_ALIAS} (${WALLET_OWNER_USER_ID})` },
   { username: WALLET_SECONDARY_USERNAME, userId: WALLET_SECONDARY_USER_ID, label: `${WALLET_SECONDARY_ALIAS} (${WALLET_SECONDARY_USER_ID})` },
+  { username: WALLET_NOMINEE_USERNAME, userId: WALLET_NOMINEE_USER_ID, label: `${WALLET_NOMINEE_ALIAS} (${WALLET_NOMINEE_USER_ID})` },
 ] as const;
 
 export function displayWalletIdentity(username: string | null | undefined, fallback = 'authenticated') {

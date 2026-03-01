@@ -113,7 +113,7 @@ export default function FiHomePage() {
   return (
     <div className="space-y-5">
       <PortalPageHeader title="FI Portal Home" subtitle="Institution dashboard for consent queue, token coverage, FI onboarding actions, and verification outcomes." environmentLabel="Demo" />
-      <section className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(140deg,rgba(15,23,42,0.96),rgba(17,24,61,0.92),rgba(25,25,78,0.95))] p-6 text-white shadow-[0_24px_60px_rgba(2,6,23,0.42)]">
+      <section className="kyc-hero-theme rounded-3xl border border-slate-700/70 bg-[linear-gradient(140deg,rgba(15,23,42,0.96),rgba(17,24,61,0.92),rgba(25,25,78,0.95))] p-6 text-white shadow-[0_24px_60px_rgba(2,6,23,0.42)]">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">FI Overview</p>
@@ -183,57 +183,6 @@ export default function FiHomePage() {
 
       <section className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
         <div className="space-y-5">
-          <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#101a45)] p-5 text-slate-100">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">General overview</p>
-                <p className="mt-1 text-sm text-slate-300">Shortcuts for core FI workflows.</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  to="/fi/create"
-                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/20"
-                >
-                  <ArrowRight className="h-4 w-4" />
-                  Create
-                </Link>
-                <Link
-                  to="/fi/queue"
-                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-300/20"
-                >
-                  <Clock className="h-4 w-4" />
-                  Queue
-                </Link>
-                <Link
-                  to="/fi/timeline"
-                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-300/20"
-                >
-                  <BadgeCheck className="h-4 w-4" />
-                  Timeline
-                </Link>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              <Link to="/fi/create" className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:bg-white/[0.07]">
-                <p className="text-sm font-semibold">Create consent</p>
-                <p className="mt-1 text-xs text-slate-300">Raise requests with explicit purpose + field scope.</p>
-              </Link>
-              <Link to="/fi/queue" className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:bg-white/[0.07]">
-                <p className="text-sm font-semibold">Consent queue</p>
-                <p className="mt-1 text-xs text-slate-300">Track approvals, rejections, and expiries.</p>
-              </Link>
-              <Link to="/fi/timeline" className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:bg-white/[0.07]">
-                <p className="text-sm font-semibold">Verification evidence</p>
-                <p className="mt-1 text-xs text-slate-300">Inspect signed assertions and registry anchors.</p>
-              </Link>
-              <Link to="/command/audit" className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:bg-white/[0.07]">
-                <p className="text-sm font-semibold">Audit trail</p>
-                <p className="mt-1 text-xs text-slate-300">End-to-end evidence across services.</p>
-              </Link>
-            </div>
-          </div>
-
           <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#0b122b)] p-5 text-slate-100">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Token coverage</p>
@@ -348,33 +297,6 @@ export default function FiHomePage() {
         </div>
 
         <div className="space-y-5">
-          <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#101a3f)] p-5 text-slate-100">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Next actions</p>
-            <div className="mt-4 space-y-2">
-              {nextActions.map((action) => (
-                <div key={action.title} className="flex items-start justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-100">{action.title}</p>
-                    <p className="mt-1 text-xs text-slate-300">{action.subtitle}</p>
-                  </div>
-                  <Link
-                    to={action.to}
-                    className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold ${
-                      action.tone === 'warn'
-                        ? 'border-rose-300/30 bg-rose-300/10 text-rose-100 hover:bg-rose-300/20'
-                        : action.tone === 'primary'
-                          ? 'border-amber-300/30 bg-amber-300/10 text-amber-100 hover:bg-amber-300/20'
-                          : 'border-slate-300/20 bg-white/5 text-slate-100 hover:bg-white/10'
-                    }`}
-                  >
-                    {action.cta}
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <NotificationList title="Notifications" items={notifications} />
 
           <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#0b122b)] p-5 text-slate-100">

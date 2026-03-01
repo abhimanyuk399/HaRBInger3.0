@@ -367,7 +367,7 @@ const walletNavItems: PortalNavItem[] = [
   { label: 'Consent History', path: '/wallet/history', description: 'Approved, rejected, expired consents' },
   { label: 'Nominees', path: '/wallet/nominees', description: 'Create/disable nominees' },
   { label: 'Delegations', path: '/wallet/delegations', description: 'Delegations created from nominees' },
-  { label: 'Operations', path: '/wallet/ops', description: 'Full approval/rejection workspace' },
+  { label: 'Activity Timeline', path: '/wallet/timeline', description: 'Wallet audit and activity trail' },
 ];
 
 const walletQuickLinks: PortalQuickLink[] = [];

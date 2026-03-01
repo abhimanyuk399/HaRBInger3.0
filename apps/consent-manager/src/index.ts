@@ -60,6 +60,64 @@ const consentTtlSeconds = Number(process.env.CONSENT_TTL_SECONDS ?? 300);
 const consentTtlMaxSeconds = Number(process.env.CONSENT_TTL_MAX_SECONDS ?? 86400);
 const walletOwnerUsername = (process.env.KEYCLOAK_WALLET_OWNER_USER ?? '').trim();
 const walletOwnerUserId = (process.env.KEYCLOAK_WALLET_OWNER_USER_ID ?? process.env.VITE_WALLET_OWNER_USER_ID ?? '').trim();
+const walletOwnerAliases = new Set(
+  [
+    process.env.KEYCLOAK_WALLET_OWNER_USER,
+    process.env.VITE_WALLET_OWNER_USERNAME,
+    process.env.VITE_WALLET_OWNER_ALIAS,
+    process.env.VITE_WALLET_OWNER_DISPLAY,
+    walletOwnerUserId,
+  ]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean)
+);
+const walletNomineeUsername = (process.env.KEYCLOAK_NOMINEE_USER ?? process.env.VITE_WALLET_NOMINEE_USERNAME ?? '').trim();
+const walletNomineeUserId = (process.env.KEYCLOAK_NOMINEE_USER_ID ?? process.env.VITE_WALLET_NOMINEE_USER_ID ?? '').trim();
+const walletNomineeAliases = new Set(
+  [
+    walletNomineeUsername,
+    process.env.VITE_WALLET_NOMINEE_ALIAS,
+    process.env.VITE_WALLET_NOMINEE_DISPLAY,
+    walletNomineeUserId,
+  ]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean)
+);
+
+function canonicalizeKnownWalletUserId(userId: string): string {
+  const normalized = userId.trim();
+  if (!normalized) return normalized;
+  if (walletOwnerUserId && walletOwnerAliases.has(normalized)) {
+    return walletOwnerUserId;
+  }
+  if (walletNomineeUserId && walletNomineeAliases.has(normalized)) {
+    return walletNomineeUserId;
+  }
+  return normalized;
+}
+
+const purposeReusePolicy: Record<string, boolean> = {
+  ACCOUNT_OPENING: true,
+  MUTUAL_FUND_KYC: true,
+  INSURANCE_ONBOARDING: true,
+  BROKERAGE_ONBOARDING: true,
+  PERIODIC_KYC_UPDATE: false,
+  LOAN_UNDERWRITING: false,
+  HIGH_VALUE_TRANSACTION: false,
+  ADDRESS_CHANGE: false,
+};
+
+function normalizePurposeKey(purpose: string | null | undefined): string {
+  return String(purpose ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+}
+
+function computePurposeBasedReuseDefault(purpose: string | null | undefined): boolean {
+  const key = normalizePurposeKey(purpose);
+  return key in purposeReusePolicy ? purposeReusePolicy[key]! : false;
+}
 requireSecret('CONSENT_SIGNING_PRIVATE_KEY', consentSigningPrivateKey);
 requireSecret('CONSENT_SERVICE_CLIENT_SECRET', serviceClientSecret);
 if (!Number.isFinite(consentTtlSeconds) || consentTtlSeconds <= 0) {
@@ -176,7 +234,7 @@ function resolveActorUserId(req: express.Request): string | null {
 
   const explicitUserId = payload.user_id;
   if (typeof explicitUserId === 'string' && explicitUserId.trim().length > 0) {
-    return explicitUserId;
+    return canonicalizeKnownWalletUserId(explicitUserId);
   }
 
   const preferredUsername = payload.preferred_username;
@@ -184,12 +242,12 @@ function resolveActorUserId(req: express.Request): string | null {
     if (walletOwnerUsername && walletOwnerUserId && preferredUsername === walletOwnerUsername) {
       return walletOwnerUserId;
     }
-    return preferredUsername;
+    return canonicalizeKnownWalletUserId(preferredUsername);
   }
 
   const subject = payload.sub;
   if (typeof subject === 'string' && subject.trim().length > 0) {
-    return subject;
+    return canonicalizeKnownWalletUserId(subject);
   }
 
   return null;
@@ -480,7 +538,8 @@ app.post(
     } = req.body;
     const userRefHash = computeUserRefHashFromIdentifier(userId);
     const requiresDelegation = Boolean(requiresDelegationRaw);
-    const allowReuseAcrossFIs = Boolean(allowReuseAcrossFIsRaw);
+    const allowReuseAcrossFIs =
+      typeof allowReuseAcrossFIsRaw === 'boolean' ? allowReuseAcrossFIsRaw : computePurposeBasedReuseDefault(purpose);
 
     const activeToken = await findActiveTokenByUserRefHash(userRefHash);
     if (!activeToken || activeToken.status !== 'ACTIVE') {
@@ -1029,6 +1088,20 @@ app.post(
 
     if (consent.status !== 'APPROVED') {
       return res.status(409).json({ error: 'consent_not_approved', status: consent.status });
+    }
+
+
+    if (actorAccess.actorType === 'DELEGATE') {
+      const sameDelegation =
+        Boolean(consent.delegationId) && Boolean(actorAccess.delegationId) && consent.delegationId === actorAccess.delegationId;
+      const approvedBySameDelegate =
+        typeof consent.approvedBy === 'string' && consent.approvedBy.trim().length > 0 && consent.approvedBy === actorUserId;
+      if (!sameDelegation && !approvedBySameDelegate) {
+        return res.status(403).json({
+          error: 'delegate_revoke_not_permitted',
+          message: 'Delegate may revoke only consents approved under the same delegation or by the same delegate.',
+        });
+      }
     }
 
     const updated = await prisma.consentRecord.update({

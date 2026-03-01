@@ -77,6 +77,15 @@ function detailAsText(detail: unknown): string {
   }
 }
 
+
+interface ActivityTimelineQuickFilter {
+  id: string;
+  label: string;
+  type?: 'all' | ActivityType;
+  service?: 'all' | ServiceName;
+  status?: 'all' | ActivityStatus;
+}
+
 interface ActivityTimelineProps {
   events: ActivityEvent[];
   title?: string;
@@ -84,6 +93,7 @@ interface ActivityTimelineProps {
   maxItems?: number;
   links?: Partial<Record<ActivityType, string>>;
   className?: string;
+  quickFilters?: ActivityTimelineQuickFilter[];
 }
 
 export function ActivityTimeline({
@@ -93,11 +103,19 @@ export function ActivityTimeline({
   maxItems = 20,
   links,
   className,
+  quickFilters,
 }: ActivityTimelineProps) {
   const [serviceFilter, setServiceFilter] = useState<'all' | ServiceName>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | ActivityStatus>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | ActivityType>('all');
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
+
+
+  const applyQuickFilter = (filter: ActivityTimelineQuickFilter) => {
+    setTypeFilter(filter.type ?? 'all');
+    setServiceFilter(filter.service ?? 'all');
+    setStatusFilter(filter.status ?? 'all');
+  };
 
   const copy = async (value: string) => {
     try {
@@ -111,6 +129,11 @@ export function ActivityTimeline({
     }
   };
 
+  const isQuickFilterActive = (filter: ActivityTimelineQuickFilter) =>
+    (filter.type ?? 'all') === typeFilter &&
+    (filter.service ?? 'all') === serviceFilter &&
+    (filter.status ?? 'all') === statusFilter;
+
   const filtered = useMemo(() => {
     return events
       .filter((event) => (serviceFilter === 'all' ? true : event.service === serviceFilter))
@@ -123,7 +146,27 @@ export function ActivityTimeline({
     <ConsoleCard className={className}>
       <SectionHeader title={title} subtitle={subtitle} />
 
-      <div className="mb-3 grid gap-2 md:grid-cols-3">
+
+      {quickFilters && quickFilters.length > 0 ? (
+        <div className="mb-2 flex flex-wrap gap-2">
+          {quickFilters.map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              onClick={() => applyQuickFilter(filter)}
+              className={
+                isQuickFilterActive(filter)
+                  ? 'rounded-full border border-blue-300/70 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 shadow-sm ring-1 ring-blue-200/70'
+                  : 'rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50'
+              }
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="mb-3 grid gap-2 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-2 md:grid-cols-3">
         <select
           value={serviceFilter}
           onChange={(event) => setServiceFilter(event.target.value as 'all' | ServiceName)}
@@ -159,7 +202,7 @@ export function ActivityTimeline({
         </select>
       </div>
 
-      <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
+      <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
         {filtered.length === 0 ? (
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">No matching activity.</p>
         ) : (
@@ -169,7 +212,7 @@ export function ActivityTimeline({
             const detail = detailAsText(event.detail);
             const pill = statusPill(event.status);
             return (
-              <div key={event.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div key={event.id} className="rounded-xl border border-slate-200/90 bg-slate-50/90 p-3 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <StatusPill status={pill.status} label={pill.label} />

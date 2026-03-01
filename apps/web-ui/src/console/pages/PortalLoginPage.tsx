@@ -69,7 +69,7 @@ export default function PortalLoginPage() {
         : canAccessPath(defaultPortalPath)
           ? defaultPortalPath
           : walletRoleGranted
-            ? '/wallet/ops'
+            ? '/wallet'
             : fiRoleGranted
               ? '/fi/queue'
               : '/command';
