@@ -34,11 +34,23 @@ const consentManagerUrl = process.env.CONSENT_MANAGER_URL ?? 'http://localhost:3
 const issuerServiceUrl = process.env.ISSUER_SERVICE_URL ?? 'http://localhost:3001';
 const issuerAdminClientId = process.env.ISSUER_ADMIN_CLIENT_ID ?? 'issuer-admin';
 const issuerAdminClientSecret = (process.env.ISSUER_ADMIN_CLIENT_SECRET ?? '').trim();
+function envFlagTrue(...values: Array<string | undefined>): boolean {
+  for (const value of values) {
+    const v = (value ?? '').trim().toLowerCase();
+    if (!v) continue;
+    if (['1','true','yes','on'].includes(v)) return true;
+    if (['0','false','no','off'].includes(v)) return false;
+  }
+  return false;
+}
+const usernameEqualsUserIdMode = envFlagTrue(process.env.IDENTITY_USERNAME_EQUALS_USERID, process.env.VITE_IDENTITY_USERNAME_EQUALS_USERID);
 const walletOwnerUsername = (process.env.KEYCLOAK_WALLET_OWNER_USER ?? '').trim();
 const walletOwnerUserId = (process.env.KEYCLOAK_WALLET_OWNER_USER_ID ?? process.env.VITE_WALLET_OWNER_USER_ID ?? '').trim();
+const walletOwnerCanonicalUsername = usernameEqualsUserIdMode && walletOwnerUserId ? walletOwnerUserId : walletOwnerUsername;
 const walletOwnerAliases = new Set(
   [
     process.env.KEYCLOAK_WALLET_OWNER_USER,
+    walletOwnerCanonicalUsername,
     process.env.VITE_WALLET_OWNER_USERNAME,
     process.env.VITE_WALLET_OWNER_ALIAS,
     process.env.VITE_WALLET_OWNER_DISPLAY,
@@ -49,9 +61,11 @@ const walletOwnerAliases = new Set(
 );
 const walletNomineeUsername = (process.env.KEYCLOAK_NOMINEE_USER ?? process.env.VITE_WALLET_NOMINEE_USERNAME ?? '').trim();
 const walletNomineeUserId = (process.env.KEYCLOAK_NOMINEE_USER_ID ?? process.env.VITE_WALLET_NOMINEE_USER_ID ?? '').trim();
+const walletNomineeCanonicalUsername = usernameEqualsUserIdMode && walletNomineeUserId ? walletNomineeUserId : walletNomineeUsername;
 const walletNomineeAliases = new Set(
   [
     walletNomineeUsername,
+    walletNomineeCanonicalUsername,
     process.env.VITE_WALLET_NOMINEE_ALIAS,
     process.env.VITE_WALLET_NOMINEE_DISPLAY,
     walletNomineeUserId,

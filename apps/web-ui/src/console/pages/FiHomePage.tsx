@@ -1,6 +1,6 @@
 import { ArrowRight, BadgeCheck, Clock, FileCheck2, Filter, RefreshCcw, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useConsole } from '../ConsoleContext';
 import { displayWalletIdentity } from '../identityConfig';
 import { NotificationList } from '../components/NotificationList';
@@ -16,6 +16,7 @@ export default function FiHomePage() {
     refreshWalletConsents,
     fiTokenCoverage,
     refreshFiTokenCoverage,
+    onboardUserFromFi,
   } = useConsole();
 
   useEffect(() => {
@@ -43,6 +44,23 @@ export default function FiHomePage() {
   }, [walletConsents, verificationResults]);
 
   const latestFailure = failures[0];
+  const [fiOnboardingUserId, setFiOnboardingUserId] = useState<string | null>(null);
+  const [fiOnboardingError, setFiOnboardingError] = useState<string | null>(null);
+
+  const handleFiOnboard = async (userId: string) => {
+    const normalized = String(userId ?? '').trim();
+    if (!normalized) return;
+    setFiOnboardingError(null);
+    setFiOnboardingUserId(normalized);
+    try {
+      await onboardUserFromFi(normalized);
+      await Promise.allSettled([refreshFiTokenCoverage(), refreshWalletConsents()]);
+    } catch (error) {
+      setFiOnboardingError(error instanceof Error ? error.message : 'Failed to fetch KYC and onboard token from FI.');
+    } finally {
+      setFiOnboardingUserId((current) => (current === normalized ? null : current));
+    }
+  };
 
   const queuePreview = useMemo(() => {
     const sorted = [...walletConsents].sort((a, b) => {
@@ -196,6 +214,21 @@ export default function FiHomePage() {
               </button>
             </div>
 
+            {(fiTokenCoverage?.summary.none ?? 0) > 0 ? (
+              <div className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-3 text-xs text-amber-100">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-semibold">Missing ACTIVE tokens detected</p>
+                    <p className="mt-1 text-amber-100/80">Use Fetch KYC + Onboard Token directly from FI portal for affected users.</p>
+                  </div>
+                  <Link to="/fi/create" className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/10 px-3 py-2 font-semibold text-slate-100 hover:bg-white/15">
+                    Open FI Create / Fetch KYC <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+                {fiOnboardingError ? <p className="mt-2 text-rose-200">{fiOnboardingError}</p> : null}
+              </div>
+            ) : null}
+
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <p className="text-xs text-slate-300">Active</p>
@@ -214,6 +247,7 @@ export default function FiHomePage() {
                     <th className="px-4 py-3">User</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Expiry</th>
+                    <th className="px-4 py-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -222,11 +256,25 @@ export default function FiHomePage() {
                       <td className="px-4 py-3 text-slate-100">{row.userId}</td>
                       <td className="px-4 py-3 text-slate-200">{row.status}</td>
                       <td className="px-4 py-3 text-slate-400">{row.expiresAt ? row.expiresAt.slice(0, 10) : '—'}</td>
+                      <td className="px-4 py-3 text-right">
+                        {String(row.status).toUpperCase() === 'NONE' ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleFiOnboard(row.userId)}
+                            disabled={fiOnboardingUserId === row.userId}
+                            className="inline-flex items-center gap-1 rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2.5 py-1.5 text-[11px] font-semibold text-cyan-100 hover:bg-cyan-300/20 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {fiOnboardingUserId === row.userId ? 'Fetching KYC...' : 'Fetch KYC + Onboard'}
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-slate-500">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {(fiTokenCoverage?.users ?? []).length === 0 && (
                     <tr>
-                      <td colSpan={3} className="px-4 py-3 text-slate-400">
+                      <td colSpan={4} className="px-4 py-3 text-slate-400">
                         No coverage data yet.
                       </td>
                     </tr>

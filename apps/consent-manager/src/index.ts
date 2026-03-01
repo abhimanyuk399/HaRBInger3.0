@@ -52,17 +52,29 @@ const keycloakTokenUrl =
   process.env.KEYCLOAK_TOKEN_URL ?? `${keycloakIssuerUrl.replace(/\/$/, '')}/protocol/openid-connect/token`;
 const serviceClientId = process.env.CONSENT_SERVICE_CLIENT_ID ?? 'issuer-admin';
 const serviceClientSecret = (process.env.CONSENT_SERVICE_CLIENT_SECRET ?? '').trim();
+function envFlagTrue(...values: Array<string | undefined>): boolean {
+  for (const value of values) {
+    const v = (value ?? '').trim().toLowerCase();
+    if (!v) continue;
+    if (['1','true','yes','on'].includes(v)) return true;
+    if (['0','false','no','off'].includes(v)) return false;
+  }
+  return false;
+}
 
 const consentSigningPrivateKey = normalizeMultilineSecret(process.env.CONSENT_SIGNING_PRIVATE_KEY ?? process.env.JWT_PRIVATE_KEY);
 const consentSigningKid = process.env.CONSENT_SIGNING_KID ?? 'consent-key';
 const consentIssuerId = process.env.CONSENT_ISSUER_ID ?? 'bharat-consent-manager';
 const consentTtlSeconds = Number(process.env.CONSENT_TTL_SECONDS ?? 300);
 const consentTtlMaxSeconds = Number(process.env.CONSENT_TTL_MAX_SECONDS ?? 86400);
+const usernameEqualsUserIdMode = envFlagTrue(process.env.IDENTITY_USERNAME_EQUALS_USERID, process.env.VITE_IDENTITY_USERNAME_EQUALS_USERID);
 const walletOwnerUsername = (process.env.KEYCLOAK_WALLET_OWNER_USER ?? '').trim();
 const walletOwnerUserId = (process.env.KEYCLOAK_WALLET_OWNER_USER_ID ?? process.env.VITE_WALLET_OWNER_USER_ID ?? '').trim();
+const walletOwnerCanonicalUsername = usernameEqualsUserIdMode && walletOwnerUserId ? walletOwnerUserId : walletOwnerUsername;
 const walletOwnerAliases = new Set(
   [
     process.env.KEYCLOAK_WALLET_OWNER_USER,
+    walletOwnerCanonicalUsername,
     process.env.VITE_WALLET_OWNER_USERNAME,
     process.env.VITE_WALLET_OWNER_ALIAS,
     process.env.VITE_WALLET_OWNER_DISPLAY,
@@ -73,9 +85,11 @@ const walletOwnerAliases = new Set(
 );
 const walletNomineeUsername = (process.env.KEYCLOAK_NOMINEE_USER ?? process.env.VITE_WALLET_NOMINEE_USERNAME ?? '').trim();
 const walletNomineeUserId = (process.env.KEYCLOAK_NOMINEE_USER_ID ?? process.env.VITE_WALLET_NOMINEE_USER_ID ?? '').trim();
+const walletNomineeCanonicalUsername = usernameEqualsUserIdMode && walletNomineeUserId ? walletNomineeUserId : walletNomineeUsername;
 const walletNomineeAliases = new Set(
   [
     walletNomineeUsername,
+    walletNomineeCanonicalUsername,
     process.env.VITE_WALLET_NOMINEE_ALIAS,
     process.env.VITE_WALLET_NOMINEE_DISPLAY,
     walletNomineeUserId,

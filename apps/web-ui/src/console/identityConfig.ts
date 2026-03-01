@@ -9,27 +9,49 @@ function readEnv(...values: Array<unknown>): string | null {
   }
   return null;
 }
+function readBoolEnv(...values: Array<unknown>): boolean {
+  for (const candidate of values) {
+    if (typeof candidate === 'boolean') return candidate;
+    if (typeof candidate === 'string') {
+      const v = candidate.trim().toLowerCase();
+      if (['1','true','yes','on'].includes(v)) return true;
+      if (['0','false','no','off'].includes(v)) return false;
+    }
+  }
+  return false;
+}
 
-export const WALLET_OWNER_USERNAME =
-  readEnv(import.meta.env.VITE_WALLET_OWNER_USERNAME, 'wallet-owner-1') ?? 'wallet-owner-1';
-export const WALLET_OWNER_ALIAS =
-  readEnv(import.meta.env.VITE_WALLET_OWNER_ALIAS, import.meta.env.VITE_WALLET_OWNER_DISPLAY, 'wallet-owner-1') ?? 'wallet-owner-1';
+export const IDENTITY_USERNAME_EQUALS_USERID = readBoolEnv(
+  import.meta.env.VITE_IDENTITY_USERNAME_EQUALS_USERID,
+  import.meta.env.VITE_USERNAME_EQUALS_USERID
+);
+
 export const WALLET_OWNER_USER_ID =
   readEnv(import.meta.env.VITE_WALLET_OWNER_USER_ID, 'KYC-1234') ?? 'KYC-1234';
+const _WALLET_OWNER_USERNAME = readEnv(import.meta.env.VITE_WALLET_OWNER_USERNAME, 'wallet-owner-1') ?? 'wallet-owner-1';
+export const WALLET_OWNER_USERNAME = IDENTITY_USERNAME_EQUALS_USERID ? WALLET_OWNER_USER_ID : _WALLET_OWNER_USERNAME;
+export const WALLET_OWNER_ALIAS = IDENTITY_USERNAME_EQUALS_USERID
+  ? WALLET_OWNER_USER_ID
+  : (readEnv(import.meta.env.VITE_WALLET_OWNER_ALIAS, import.meta.env.VITE_WALLET_OWNER_DISPLAY, 'wallet-owner-1') ?? 'wallet-owner-1');
 
-export const WALLET_SECONDARY_USERNAME = readEnv(import.meta.env.VITE_WALLET_SECONDARY_USERNAME, 'wallet-user-2') ?? 'wallet-user-2';
-export const WALLET_SECONDARY_ALIAS = readEnv(import.meta.env.VITE_WALLET_SECONDARY_ALIAS, 'wallet-user-2') ?? 'wallet-user-2';
 export const WALLET_SECONDARY_USER_ID =
   readEnv(import.meta.env.VITE_WALLET_SECONDARY_USER_ID, 'KYC-5678') ?? 'KYC-5678';
+const _WALLET_SECONDARY_USERNAME = readEnv(import.meta.env.VITE_WALLET_SECONDARY_USERNAME, 'wallet-user-2') ?? 'wallet-user-2';
+export const WALLET_SECONDARY_USERNAME = IDENTITY_USERNAME_EQUALS_USERID ? WALLET_SECONDARY_USER_ID : _WALLET_SECONDARY_USERNAME;
+export const WALLET_SECONDARY_ALIAS = IDENTITY_USERNAME_EQUALS_USERID
+  ? WALLET_SECONDARY_USER_ID
+  : (readEnv(import.meta.env.VITE_WALLET_SECONDARY_ALIAS, 'wallet-user-2') ?? 'wallet-user-2');
 
-export const WALLET_NOMINEE_USERNAME =
-  readEnv(import.meta.env.VITE_WALLET_NOMINEE_USERNAME, 'wallet-nominee-1') ??
-  'wallet-nominee-1';
-export const WALLET_NOMINEE_ALIAS =
-  readEnv(import.meta.env.VITE_WALLET_NOMINEE_ALIAS, import.meta.env.VITE_WALLET_NOMINEE_DISPLAY, 'wallet-nominee-1') ??
-  'wallet-nominee-1';
 export const WALLET_NOMINEE_USER_ID =
   readEnv(import.meta.env.VITE_WALLET_NOMINEE_USER_ID, 'wallet-nominee-1') ?? 'wallet-nominee-1';
+const _WALLET_NOMINEE_USERNAME =
+  readEnv(import.meta.env.VITE_WALLET_NOMINEE_USERNAME, 'wallet-nominee-1') ??
+  'wallet-nominee-1';
+export const WALLET_NOMINEE_USERNAME = IDENTITY_USERNAME_EQUALS_USERID ? WALLET_NOMINEE_USER_ID : _WALLET_NOMINEE_USERNAME;
+export const WALLET_NOMINEE_ALIAS = IDENTITY_USERNAME_EQUALS_USERID
+  ? WALLET_NOMINEE_USER_ID
+  : (readEnv(import.meta.env.VITE_WALLET_NOMINEE_ALIAS, import.meta.env.VITE_WALLET_NOMINEE_DISPLAY, 'wallet-nominee-1') ??
+  'wallet-nominee-1');
 
 export const FI_CLIENT_ID = readEnv(import.meta.env.VITE_FI_CLIENT_ID, 'fi-client') ?? 'fi-client';
 export const FI2_CLIENT_ID = readEnv(import.meta.env.VITE_FI2_CLIENT_ID, 'fi-client-2') ?? 'fi-client-2';
