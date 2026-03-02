@@ -27,7 +27,7 @@ export const IDENTITY_USERNAME_EQUALS_USERID = readBoolEnv(
 );
 
 export const WALLET_OWNER_USER_ID =
-  readEnv(import.meta.env.VITE_WALLET_OWNER_USER_ID, 'KYC-1234') ?? 'KYC-1234';
+  readEnv(import.meta.env.VITE_WALLET_OWNER_USER_ID, 'wallet-owner-1') ?? 'wallet-owner-1';
 const _WALLET_OWNER_USERNAME = readEnv(import.meta.env.VITE_WALLET_OWNER_USERNAME, 'wallet-owner-1') ?? 'wallet-owner-1';
 export const WALLET_OWNER_USERNAME = IDENTITY_USERNAME_EQUALS_USERID ? WALLET_OWNER_USER_ID : _WALLET_OWNER_USERNAME;
 export const WALLET_OWNER_ALIAS = IDENTITY_USERNAME_EQUALS_USERID
@@ -35,7 +35,7 @@ export const WALLET_OWNER_ALIAS = IDENTITY_USERNAME_EQUALS_USERID
   : (readEnv(import.meta.env.VITE_WALLET_OWNER_ALIAS, import.meta.env.VITE_WALLET_OWNER_DISPLAY, 'wallet-owner-1') ?? 'wallet-owner-1');
 
 export const WALLET_SECONDARY_USER_ID =
-  readEnv(import.meta.env.VITE_WALLET_SECONDARY_USER_ID, 'KYC-5678') ?? 'KYC-5678';
+  readEnv(import.meta.env.VITE_WALLET_SECONDARY_USER_ID, 'wallet-user-2') ?? 'wallet-user-2';
 const _WALLET_SECONDARY_USERNAME = readEnv(import.meta.env.VITE_WALLET_SECONDARY_USERNAME, 'wallet-user-2') ?? 'wallet-user-2';
 export const WALLET_SECONDARY_USERNAME = IDENTITY_USERNAME_EQUALS_USERID ? WALLET_SECONDARY_USER_ID : _WALLET_SECONDARY_USERNAME;
 export const WALLET_SECONDARY_ALIAS = IDENTITY_USERNAME_EQUALS_USERID

@@ -198,7 +198,7 @@ export default function PortalLoginPage() {
                   placeholder={loginPortal === 'fi' ? 'fi-analyst-1' : 'wallet-owner-1'}
                 />
                 <p className="kyc-form-hint">
-                  Hint: {loginPortal === 'fi' ? '`fi-analyst-1` or `fi-analyst-2`' : '`wallet-owner-1` or `wallet-nominee`'}
+                  Hint: {loginPortal === 'fi' ? '`fi-analyst-1` or `fi-analyst-2`' : '`wallet-owner-1` or `wallet-nominee-1`'}
                 </p>
               </label>
             </div>

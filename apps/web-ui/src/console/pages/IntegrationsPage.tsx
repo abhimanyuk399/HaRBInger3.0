@@ -48,6 +48,7 @@ const mockConnectorSamples: Record<ConnectorKey, { name: string; status: WorkSta
 };
 
 export default function IntegrationsPage() {
+  const commandBirdsEyeOnly = true;
   const { runningAction, dueUsers, reviewRun, loadDueUsers, runReviewOnce } = useConsole();
   const [asOf, setAsOf] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -166,7 +167,7 @@ const runMockConnector = async (connector: ConnectorKey) => {
               size="sm"
               className="mt-2"
               onClick={() => runMockConnector('ckycr')}
-              disabled={runningAction !== null}
+              disabled={commandBirdsEyeOnly || runningAction !== null}
             >
               <RefreshCw className="h-3.5 w-3.5" />
               Test health
@@ -230,11 +231,11 @@ const runMockConnector = async (connector: ConnectorKey) => {
                 className="mt-1 block kyc-form-input kyc-form-input-sm"
               />
             </label>
-            <ConsoleButton intent="secondary" onClick={() => void loadDueUsers(asOf)} disabled={runningAction !== null}>
+            <ConsoleButton intent="secondary" onClick={() => void loadDueUsers(asOf)} disabled={commandBirdsEyeOnly || runningAction !== null}>
               <Layers className="h-4 w-4" />
               Load due list
             </ConsoleButton>
-            <ConsoleButton onClick={() => void runReviewOnce(asOf)} disabled={runningAction !== null}>
+            <ConsoleButton onClick={() => void runReviewOnce(asOf)} disabled={commandBirdsEyeOnly || runningAction !== null}>
               <CalendarClock className="h-4 w-4" />
               Run once
             </ConsoleButton>
@@ -334,7 +335,7 @@ const runMockConnector = async (connector: ConnectorKey) => {
               </div>
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => void copyText(String(mockConnectorSamples[selectedConnector].sample.endpoint ?? ''))} className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">Copy endpoint</button>
-                <ConsoleButton intent="secondary" size="sm" onClick={() => runMockConnector(selectedConnector)}>
+                <ConsoleButton intent="secondary" size="sm" onClick={() => runMockConnector(selectedConnector)} disabled={commandBirdsEyeOnly}>
                 <FileCheck className="h-3.5 w-3.5" />
                 Run mock
               </ConsoleButton>
@@ -354,7 +355,7 @@ const runMockConnector = async (connector: ConnectorKey) => {
 
       <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
         <ConsoleCard className="border-slate-200 bg-white">
-          <SectionHeader title="Privacy & compliance guardrails (demo config)" subtitle="Show explicit privacy controls to strengthen problem statement mapping (c, d, f)." action={<div className="flex items-center gap-2">{hasUnsavedPolicyChanges ? <StatusPill status="warn" label="Unsaved changes" /> : <StatusPill status="ok" label="Defaults/loaded" />}<ConsoleButton intent="secondary" size="sm" onClick={() => void loadPolicyFromAdapter()}>Load</ConsoleButton><ConsoleButton intent="secondary" size="sm" onClick={() => setPolicyForm(defaultPolicyForm)}>Reset</ConsoleButton><ConsoleButton size="sm" onClick={() => void savePolicyToAdapter()}><Lock className="h-3.5 w-3.5" />{policySaveState === 'saved' ? 'Saved' : policySaveState === 'error' ? 'Retry save' : 'Save policy'}</ConsoleButton></div>} />
+          <SectionHeader title="Privacy & compliance guardrails (demo config)" subtitle="Show explicit privacy controls to strengthen problem statement mapping (c, d, f)." action={<div className="flex items-center gap-2">{hasUnsavedPolicyChanges ? <StatusPill status="warn" label="Unsaved changes" /> : <StatusPill status="ok" label="Defaults/loaded" />}<ConsoleButton intent="secondary" size="sm" onClick={() => void loadPolicyFromAdapter()} disabled={commandBirdsEyeOnly}>Load</ConsoleButton><ConsoleButton intent="secondary" size="sm" onClick={() => setPolicyForm(defaultPolicyForm)} disabled={commandBirdsEyeOnly}>Reset</ConsoleButton><ConsoleButton size="sm" onClick={() => void savePolicyToAdapter()} disabled={commandBirdsEyeOnly}><Lock className="h-3.5 w-3.5" />{policySaveState === 'saved' ? 'Saved' : policySaveState === 'error' ? 'Retry save' : 'Save policy'}</ConsoleButton></div>} />
 
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <label className="kyc-form-field text-sm text-slate-700">

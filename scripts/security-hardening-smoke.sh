@@ -130,7 +130,7 @@ FI_CLIENT_ID="$(env_get KEYCLOAK_FI_CLIENT_ID)"
 [[ -z "$FI_CLIENT_ID" ]] && FI_CLIENT_ID="fi-client"
 FI_SECRET="$(env_get KEYCLOAK_FI_CLIENT_SECRET)"
 UID_VALUE="$(env_get VITE_WALLET_OWNER_USER_ID)"
-[[ -z "$UID_VALUE" ]] && UID_VALUE="KYC-1234"
+[[ -z "$UID_VALUE" ]] && UID_VALUE="wallet-owner-1"
 
 if [[ -z "$FI_SECRET" ]]; then
   echo "Missing KEYCLOAK_FI_CLIENT_SECRET in .env" >&2
@@ -155,7 +155,7 @@ fi
 
 # 2) FI token should not be accepted for owner delegation create.
 EXPIRY_UTC="$(perl -MPOSIX -e 'print strftime("%Y-%m-%dT%H:%M:%SZ", gmtime(time()+2*24*3600))')"
-DELEG_PAYLOAD="$(jq -n --arg uid "$UID_VALUE" --arg exp "$EXPIRY_UTC" '{ownerUserId:$uid,delegateUserId:"wallet-nominee",scope:"consent.approve",allowedPurposes:["insurance-claim"],allowedFields:["fullName","dob"],expiresAt:$exp}')"
+DELEG_PAYLOAD="$(jq -n --arg uid "$UID_VALUE" --arg exp "$EXPIRY_UTC" '{ownerUserId:$uid,delegateUserId:"wallet-nominee-1",scope:"consent.approve",allowedPurposes:["insurance-claim"],allowedFields:["fullName","dob"],expiresAt:$exp}')"
 json_call POST "$WALLET_BASE_URL/v1/wallet/delegations" "$FI_ACCESS" "$DELEG_PAYLOAD"
 if [[ "$LAST_HTTP_STATUS" == "401" || "$LAST_HTTP_STATUS" == "403" ]]; then
   add_result "Role isolation (FI token blocked from wallet owner action)" "PASS" "HTTP $LAST_HTTP_STATUS"

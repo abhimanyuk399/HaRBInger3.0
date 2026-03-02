@@ -11,9 +11,9 @@ const env = {
   KEYCLOAK_ADMIN_PASSWORD: 'admin',
   KEYCLOAK_WALLET_OWNER_USER: 'wallet-owner-1',
   KEYCLOAK_WALLET_OWNER_PASSWORD: 'wallet-owner-1-pass',
-  KEYCLOAK_WALLET_OWNER_USER_ID: 'KYC-1234',
-  KEYCLOAK_NOMINEE_USER: 'wallet-nominee',
-  KEYCLOAK_NOMINEE_PASSWORD: 'wallet-nominee-pass',
+  KEYCLOAK_WALLET_OWNER_USER_ID: 'wallet-owner-1',
+  KEYCLOAK_NOMINEE_USER: 'wallet-nominee-1',
+  KEYCLOAK_NOMINEE_PASSWORD: 'wallet-nominee-1-pass',
   KEYCLOAK_FI_CLIENT_ID: 'fi-client',
   KEYCLOAK_FI_BROWSER_CLIENT_ID: 'fi-browser-client',
   KEYCLOAK_FI2_CLIENT_ID: 'fi-client-2',
@@ -32,8 +32,8 @@ const env = {
   VITE_FI_KEYCLOAK_CLIENT_ID: 'fi-browser-client',
   VITE_FI_CLIENT_ID: 'fi-client',
   VITE_FI2_CLIENT_ID: 'fi-client-2',
-  VITE_WALLET_OWNER_USER_ID: 'KYC-1234',
-  VITE_WALLET_SECONDARY_USER_ID: 'KYC-5678',
+  VITE_WALLET_OWNER_USER_ID: 'wallet-owner-1',
+  VITE_WALLET_SECONDARY_USER_ID: 'wallet-user-2',
 };
 
 const content = `${Object.entries(env)

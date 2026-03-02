@@ -336,6 +336,7 @@ function inferTimelineTarget(event: ActivityEvent) {
 }
 
 export default function CommandCenterPage() {
+  const commandBirdsEyeOnly = true;
   const navigate = useNavigate();
   const {
     authenticated,
@@ -786,125 +787,16 @@ export default function CommandCenterPage() {
 
       <ConsoleCard id="issuer-onboarding" className="border-slate-200/90 bg-[linear-gradient(140deg,rgba(255,255,255,0.98),rgba(248,250,252,0.93))]">
         <SectionHeader
-          title="Onboard Customer (Issuer)"
-          subtitle="Issuer-led onboarding: fetch CKYCR record and issue an ACTIVE token before FI consent requests."
-          action={<StatusPill status={ckycMode === 'sandbox' ? 'warn' : 'neutral'} label={ckycMode === 'sandbox' ? 'CKYCR: Sandbox' : 'CKYCR: Local adapter'} />}
+          title="FI Onboarding"
+          subtitle="Token creation has been moved to the FI Portal to avoid user/operator confusion. Command Centre remains focused on service health, audit, and orchestration."
+          action={<StatusPill status="ok" label="Moved to FI Portal" />}
         />
-        <div className="grid gap-3 xl:grid-cols-[1.2fr_1fr]">
-          <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <label className="kyc-form-field block">
-              Wallet user ID
-              <input
-                type="text"
-                value={onboardingWalletUserId}
-                onChange={(event) => setOnboardingWalletUserId(event.target.value)}
-                placeholder={WALLET_OWNER_USER_ID}
-                className="mt-1 kyc-form-input kyc-form-input-sm"
-              />
-            </label>
-            <label className="kyc-form-field block">
-              CKYC reference
-              <input
-                type="text"
-                value={onboardingCkycReference}
-                onChange={(event) => setOnboardingCkycReference(event.target.value)}
-                placeholder="CKYC reference"
-                className="mt-1 kyc-form-input kyc-form-input-sm"
-              />
-            </label>
-            <label className="kyc-form-field block">
-              Notes (optional)
-              <input
-                type="text"
-                value={onboardingNotes}
-                onChange={(event) => setOnboardingNotes(event.target.value)}
-                placeholder="Onboarding context for operations log"
-                className="mt-1 kyc-form-input kyc-form-input-sm"
-              />
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <ConsoleButton
-                type="button"
-                intent="secondary"
-                onClick={() => void fetchCkycPreview()}
-                disabled={fetchingCkycPreview || issuingAndActivatingToken}
-              >
-                {fetchingCkycPreview ? 'Fetching CKYCR...' : 'Fetch CKYCR'}
-              </ConsoleButton>
-              <ConsoleButton
-                type="button"
-                intent="primary"
-                onClick={() => void issueAndActivateToken()}
-                disabled={fetchingCkycPreview || issuingAndActivatingToken}
-              >
-                <ShieldCheck className="h-4 w-4" />
-                {issuingAndActivatingToken ? 'Issuing token...' : 'Issue & Activate Token'}
-              </ConsoleButton>
-              <Link
-                to="/fi/queue"
-                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-              >
-                Open FI Portal
-              </Link>
-            </div>
-            <p className="text-xs text-slate-500">
-              Fetch CKYCR first to prefill onboarding evidence, then issue and activate token for the selected wallet user.
-            </p>
-            {onboardingInfo ? (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-900">{onboardingInfo}</div>
-            ) : null}
-            {onboardingError ? (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs text-rose-900">{onboardingError}</div>
-            ) : null}
-          </div>
-
-          <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issuer evidence</p>
-            {ckycPreview ? (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700">
-                <p className="font-semibold text-slate-900">CKYCR preview</p>
-                <p className="mt-1">source: {ckycPreview.source}</p>
-                <p>reference: {ckycPreview.reference}</p>
-                <p>fetchedAt: {formatDateTime(ckycPreview.fetchedAt)}</p>
-                <p>userId: {ckycPreview.profile.userId}</p>
-                <p>profileVersion: {ckycPreview.profile.profileVersion}</p>
-                <CopyValueField label="ckycHash" value={ckycPreview.profile.hash} />
-                <p>addressLine1: {readIdentifier(ckycPreview.profile.payload.addressLine1) ?? '-'}</p>
-                <p>pincode: {readIdentifier(ckycPreview.profile.payload.pincode) ?? '-'}</p>
-                <p className="mt-1">{ckycPreview.summary}</p>
-              </div>
-            ) : (
-              <p className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
-                Fetch CKYCR to preview onboarding evidence.
-              </p>
-            )}
-
-            {onboardingResult ? (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700">
-                <p className="font-semibold text-slate-900">Issue and activate result</p>
-                <p className="mt-1">walletUserId: {onboardingResult.walletUserId}</p>
-                <p>ckycReference: {onboardingResult.ckycReference ?? '-'}</p>
-                <p>tokenStatus: {onboardingResult.tokenStatus}</p>
-                <p>issuedAt: {formatDateTime(onboardingResult.issuedAt)}</p>
-                {onboardingNotes.trim().length > 0 ? <p>notes: {onboardingNotes.trim()}</p> : null}
-                <div className="mt-2 space-y-1">
-                  <CopyValueField label="tokenId" value={onboardingResult.tokenId} />
-                  <CopyValueField label="requestId" value={onboardingResult.requestId} />
-                  <CopyValueField label="correlationId" value={onboardingResult.correlationId} />
-                </div>
-                <p className="mt-1">expiry: {formatDateTime(onboardingResult.tokenExpiresAt)}</p>
-                <Link
-                  to="/wallet/ops"
-                  className="mt-2 inline-flex items-center text-xs font-semibold text-slate-700 hover:underline"
-                >
-                  Open Wallet Portal <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            ) : (
-              <p className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
-                Issue token to capture ACTIVE registry evidence for FI pre-check.
-              </p>
-            )}
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          If a user does not have an ACTIVE token, create it from the <span className="font-semibold">FI Portal</span> using <span className="font-semibold">Onboard user from FI</span>.
+          <div className="mt-3">
+            <Link to="/fi/queue" className="inline-flex items-center rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">
+              Open FI Portal <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
       </ConsoleCard>
@@ -913,30 +805,30 @@ export default function CommandCenterPage() {
         <ConsoleCard className="xl:order-3 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,250,251,0.94))]">
           <SectionHeader
             title="Workflow Runs"
-            subtitle="Run operational workflows with clear step status."
+            subtitle="Bird's-eye view only. Run operational workflows from FI/Wallet portals; monitor step status here."
             action={<StatusPill status={runnerPill.status} label={runnerPill.label} />}
           />
 
           <div className="grid gap-2 md:grid-cols-2">
-            <ConsoleButton onClick={() => void startGuidedWalkthrough()} disabled={runningAction !== null || guided.running}>
+            <ConsoleButton onClick={() => void startGuidedWalkthrough()} disabled={commandBirdsEyeOnly || runningAction !== null || guided.running}>
               <PlayCircle className="h-4 w-4" />
               Run full workflow
             </ConsoleButton>
 
-            <ConsoleButton intent={authenticated ? 'secondary' : 'primary'} onClick={() => void loginWallet()} disabled={runningAction !== null || authenticated}>
+            <ConsoleButton intent={authenticated ? 'secondary' : 'primary'} onClick={() => void loginWallet()} disabled={commandBirdsEyeOnly || runningAction !== null || authenticated}>
               {authenticated ? `Wallet: ${displayWalletIdentity(activeWalletUsername)}` : 'Authenticate wallet'}
             </ConsoleButton>
 
-            <ConsoleButton intent="secondary" onClick={() => navigateToTarget('/command/audit')} disabled={runningAction !== null}>
+            <ConsoleButton intent="secondary" onClick={() => navigateToTarget('/command/audit')} disabled={commandBirdsEyeOnly || runningAction !== null}>
               Open Audit
             </ConsoleButton>
           </div>
 
           <div className="mt-2 grid gap-2 md:grid-cols-2">
-            <ConsoleButton intent="secondary" onClick={() => setWalkthroughOpen(true)} disabled={runningAction !== null}>
+            <ConsoleButton intent="secondary" onClick={() => setWalkthroughOpen(true)} disabled={commandBirdsEyeOnly || runningAction !== null}>
               Open workflow progress
             </ConsoleButton>
-            <ConsoleButton intent="secondary" onClick={() => void resumeGuidedWalkthrough()} disabled={runningAction !== null || guided.running || !guided.blockedReason}>
+            <ConsoleButton intent="secondary" onClick={() => void resumeGuidedWalkthrough()} disabled={commandBirdsEyeOnly || runningAction !== null || guided.running || !guided.blockedReason}>
               Resume workflow
             </ConsoleButton>
           </div>

@@ -219,9 +219,9 @@ export default function CommandHomePage() {
                 <p className="text-sm font-semibold">Audit trail</p>
                 <p className="mt-1 text-xs text-slate-300">Evidence chain across issuer → registry → FI → wallet.</p>
               </Link>
-              <Link to="/command/verifier" className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:bg-white/[0.07]">
-                <p className="text-sm font-semibold">Verifier tools</p>
-                <p className="mt-1 text-xs text-slate-300">Validate signed assertions and CKYCR checks.</p>
+              <Link to="/fi/queue" className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:bg-white/[0.07]">
+                <p className="text-sm font-semibold">Open FI operations</p>
+                <p className="mt-1 text-xs text-slate-300">Use FI Portal for consent, verification, and customer-facing actions.</p>
               </Link>
               <Link to="/command/integrations" className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:bg-white/[0.07]">
                 <p className="text-sm font-semibold">Integrations</p>

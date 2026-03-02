@@ -71,6 +71,7 @@ function isWalletAuthErrorMessage(message: string) {
 }
 
 export default function ScenarioOrchestrationPage() {
+  const commandBirdsEyeOnly = true;
   const {
     guided,
     scenarioId,
@@ -441,7 +442,7 @@ export default function ScenarioOrchestrationPage() {
       <div className="space-y-4">
         <PortalPageHeader
           title="Scenario Orchestration"
-          subtitle="Run end-to-end tokenised KYC demos with lifecycle controls, periodic review, CKYCR supersede, and delegation proof."
+          subtitle="Bird's-eye monitoring of end-to-end tokenised KYC demos. Execute customer actions from FI/Wallet portals."
           environmentLabel="Demo"
           badges={
             <>
@@ -459,10 +460,10 @@ export default function ScenarioOrchestrationPage() {
               <CardHint className="mt-1">Use this guided area during demo to show revocation, renewal, periodic update scheduling, and CKYCR supersede in one place.</CardHint>
             </div>
             <div className="flex flex-wrap gap-2">
-              <ConsoleButton size="sm" intent="secondary" onClick={() => void runPeriodicLifecyclePolish()} disabled={runningAction !== null}>Run periodic review</ConsoleButton>
-              <ConsoleButton size="sm" intent="secondary" onClick={() => void renewConsent()} disabled={runningAction !== null}>Renew consent</ConsoleButton>
-              <ConsoleButton size="sm" intent="secondary" onClick={() => void runCkycSupersede()} disabled={runningAction !== null}>CKYCR supersede</ConsoleButton>
-              <ConsoleButton size="sm" intent="secondary" onClick={() => void runRevokeVerifyFailFlow()} disabled={runningAction !== null}>Revoke → fail verify</ConsoleButton>
+              <ConsoleButton size="sm" intent="secondary" onClick={() => void runPeriodicLifecyclePolish()} disabled={commandBirdsEyeOnly || runningAction !== null}>Run periodic review</ConsoleButton>
+              <ConsoleButton size="sm" intent="secondary" onClick={() => void renewConsent()} disabled={commandBirdsEyeOnly || runningAction !== null}>Renew consent</ConsoleButton>
+              <ConsoleButton size="sm" intent="secondary" onClick={() => void runCkycSupersede()} disabled={commandBirdsEyeOnly || runningAction !== null}>CKYCR supersede</ConsoleButton>
+              <ConsoleButton size="sm" intent="secondary" onClick={() => void runRevokeVerifyFailFlow()} disabled={commandBirdsEyeOnly || runningAction !== null}>Revoke → fail verify</ConsoleButton>
             </div>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -549,7 +550,7 @@ export default function ScenarioOrchestrationPage() {
             <p className="mt-1 text-xs text-slate-600">
               Runs issue {'->'} request {'->'} approve {'->'} verify {'->'} revoke {'->'} TOKEN_NOT_ACTIVE.
             </p>
-            <ConsoleButton className="mt-2 w-full" onClick={() => void runScenarioAEndToEnd()} disabled={runningAction !== null}>
+            <ConsoleButton className="mt-2 w-full" onClick={() => void runScenarioAEndToEnd()} disabled={commandBirdsEyeOnly || runningAction !== null}>
               Run Scenario A End-to-End
             </ConsoleButton>
           </section>
@@ -557,7 +558,7 @@ export default function ScenarioOrchestrationPage() {
           <section id="scenario-b-run" className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">Run Scenario B (insurance-claim)</p>
             <p className="mt-1 text-xs text-slate-600">Reuses same orchestration with insurance purpose/scope defaults.</p>
-            <ConsoleButton className="mt-2 w-full" onClick={() => void runScenarioBInsurance()} disabled={runningAction !== null}>
+            <ConsoleButton className="mt-2 w-full" onClick={() => void runScenarioBInsurance()} disabled={commandBirdsEyeOnly || runningAction !== null}>
               Run Scenario B Reuse
             </ConsoleButton>
           </section>
@@ -565,7 +566,7 @@ export default function ScenarioOrchestrationPage() {
           <section id="consent-reject-quick" className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">Consent Reject Flow</p>
             <p className="mt-1 text-xs text-slate-600">Forces reject branch and verifies CONSENT_REJECTED.</p>
-            <ConsoleButton className="mt-2 w-full" intent="secondary" onClick={() => void runConsentRejectFlow()} disabled={runningAction !== null}>
+            <ConsoleButton className="mt-2 w-full" intent="secondary" onClick={() => void runConsentRejectFlow()} disabled={commandBirdsEyeOnly || runningAction !== null}>
               Run Reject Path
             </ConsoleButton>
           </section>
@@ -574,10 +575,10 @@ export default function ScenarioOrchestrationPage() {
             <p className="text-sm font-semibold text-slate-900">Consent Expiry + Renew</p>
             <p className="mt-1 text-xs text-slate-600">Wait until consent TTL passes, then run verify fail and renew.</p>
             <div className="mt-2 grid gap-2">
-              <ConsoleButton intent="secondary" onClick={() => void verifyExpectedFailure('CONSENT_EXPIRED')} disabled={runningAction !== null}>
+              <ConsoleButton intent="secondary" onClick={() => void verifyExpectedFailure('CONSENT_EXPIRED')} disabled={commandBirdsEyeOnly || runningAction !== null}>
                 Verify Expect CONSENT_EXPIRED
               </ConsoleButton>
-              <ConsoleButton intent="secondary" onClick={() => void renewConsent()} disabled={runningAction !== null}>
+              <ConsoleButton intent="secondary" onClick={() => void renewConsent()} disabled={commandBirdsEyeOnly || runningAction !== null}>
                 Renew Consent
               </ConsoleButton>
             </div>
@@ -586,7 +587,7 @@ export default function ScenarioOrchestrationPage() {
           <section id="ckyc-supersede-quick" className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">CKYCR Supersede Flow</p>
             <p className="mt-1 text-xs text-slate-600">Simulate CKYCR update and sync supersede chain.</p>
-            <ConsoleButton className="mt-2 w-full" intent="secondary" onClick={() => void runCkycSupersede()} disabled={runningAction !== null}>
+            <ConsoleButton className="mt-2 w-full" intent="secondary" onClick={() => void runCkycSupersede()} disabled={commandBirdsEyeOnly || runningAction !== null}>
               Run CKYCR Supersede
             </ConsoleButton>
           </section>
@@ -594,7 +595,7 @@ export default function ScenarioOrchestrationPage() {
           <section id="revoke-verify-fail-quick" className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">Revoke + Verify Fail</p>
             <p className="mt-1 text-xs text-slate-600">Runs revoke and immediate verify failure check.</p>
-            <ConsoleButton className="mt-2 w-full" intent="secondary" onClick={() => void runRevokeVerifyFailFlow()} disabled={runningAction !== null}>
+            <ConsoleButton className="mt-2 w-full" intent="secondary" onClick={() => void runRevokeVerifyFailFlow()} disabled={commandBirdsEyeOnly || runningAction !== null}>
               Run Revoke + Fail
             </ConsoleButton>
           </section>
@@ -648,7 +649,7 @@ export default function ScenarioOrchestrationPage() {
                       </span>
                     ) : null}
                     {step.requiresLogin && !authenticated && !demoBypassWalletLogin ? (
-                      <ConsoleButton size="sm" intent="secondary" onClick={() => void loginWallet()} disabled={runningAction !== null}>
+                      <ConsoleButton size="sm" intent="secondary" onClick={() => void loginWallet()} disabled={commandBirdsEyeOnly || runningAction !== null}>
                         Login now
                       </ConsoleButton>
                     ) : null}

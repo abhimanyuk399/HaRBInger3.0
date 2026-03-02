@@ -78,11 +78,10 @@ export default function CommandLoginPage() {
       <div className="space-y-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-950">Welcome back</h2>
-          <p className="mt-1 text-sm text-slate-600">Command Centre can run in read-only mode or require admin authentication.</p>
+          <p className="mt-1 text-sm text-slate-600">Sign in with Command Centre admin credentials to access operational workflows.</p>
         </div>
 
-        {COMMAND_PORTAL_ADMIN_LOGIN_REQUIRED ? (
-          <div className="grid gap-3">
+        <div className="grid gap-3">
             <label className="kyc-form-field">
               <span className="kyc-form-label">Username</span>
               <input
@@ -123,7 +122,6 @@ export default function CommandLoginPage() {
               <p className="kyc-form-hint">Hint: demo password format `&lt;username&gt;-pass`</p>
             </label>
           </div>
-        ) : null}
 
         <StatusPill
           status={adminActive ? 'ok' : 'warn'}
@@ -165,8 +163,7 @@ export default function CommandLoginPage() {
           ) : null}
         </div>
 
-        {COMMAND_PORTAL_ADMIN_LOGIN_REQUIRED ? (
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
             {authenticated && adminRoleGranted ? (
               <ConsoleButton type="button" className="min-w-[180px]" intent="secondary" onClick={() => void logoutWallet('/command/login')}>
                 Logout admin
@@ -193,7 +190,6 @@ export default function CommandLoginPage() {
               </>
             )}
           </div>
-        ) : null}
 
         <div className="flex flex-wrap gap-2">
           <Link

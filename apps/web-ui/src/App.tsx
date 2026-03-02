@@ -5,7 +5,6 @@ import CommandCenterPage from './console/pages/CommandCenterPage';
 import ScenarioOrchestrationPage from './console/pages/ScenarioOrchestrationPage';
 import WalletOpsPage from './console/pages/WalletOpsPage';
 import FiConsolePage from './console/pages/FiConsolePage';
-import VerifierPage from './console/pages/VerifierPage';
 import IntegrationsPage from './console/pages/IntegrationsPage';
 import AuditPage from './console/pages/AuditPage';
 import RegistryPage from './console/pages/RegistryPage';
@@ -94,7 +93,7 @@ function ConsoleAliasRedirect() {
   } else if (firstSegment === 'command') {
     const remaining = remainingSegments.join('/');
     target = remaining ? `/command/${remaining}` : '/command';
-  } else if (firstSegment === 'scenario' || firstSegment === 'verifier' || firstSegment === 'integrations' || firstSegment === 'audit') {
+  } else if (firstSegment === 'scenario' || firstSegment === 'integrations' || firstSegment === 'audit') {
     target = `/command/${legacyPath}`;
   }
 
@@ -133,7 +132,7 @@ export default function App() {
             <Route path="registry" element={<RegistryPage />} />
             <Route path="overview" element={<Navigate to="/command/operations" replace />} />
             <Route path="scenario" element={<ScenarioOrchestrationPage />} />
-            <Route path="verifier" element={<VerifierPage />} />
+            <Route path="verifier" element={<Navigate to="/command" replace />} />
             <Route path="integrations" element={<IntegrationsPage />} />
             <Route path="audit" element={<AuditPage />} />
           </Route>

@@ -13,8 +13,8 @@ import { SectionHeader } from '../components/SectionHeader';
 import { StatusPill } from '../components/StatusPill';
 import { formatDateTime, truncate } from '../utils';
 
-type ConsentLifecycle = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'UNKNOWN';
-type ConsentFilter = 'all' | 'pending' | 'approved' | 'rejected' | 'expired';
+type ConsentLifecycle = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REVOKED' | 'EXPIRED' | 'UNKNOWN';
+type ConsentFilter = 'all' | 'pending' | 'approved' | 'rejected' | 'revoked' | 'expired';
 type ApprovalPolicy = 'owner' | 'delegation_required' | 'either';
 type PurposeOption = 'Account Opening' | 'KYC Refresh' | 'Loan Processing' | 'Credit Card' | 'Periodic Review' | '__custom__';
 
@@ -163,7 +163,7 @@ function toConsentCreateErrorMessage(error: unknown) {
   const fallbackMessage = error.message || 'Failed to create consent.';
   const fallbackLower = fallbackMessage.toLowerCase();
   if (fallbackLower.includes('token_not_found') || fallbackLower.includes('no_active_token') || fallbackLower.includes('token required')) {
-    return "Token required before requesting consent. Use 'Onboard user from FI' below (or Command Centre issuer onboarding) to create an ACTIVE token.";
+    return "Token required before requesting consent. Use 'Onboard user from FI' below to create an ACTIVE token.";
   }
   if (fallbackLower.includes('consent_expired')) {
     return 'Consent has expired. Create a renewal request with updated expiry.';
@@ -250,6 +250,9 @@ function deriveStatus(statusValue: unknown, expiresAt: string | null): ConsentLi
   if (normalized === 'REJECTED') {
     return 'REJECTED';
   }
+  if (normalized === 'REVOKED') {
+    return 'REVOKED';
+  }
   if (normalized === 'EXPIRED' || expired) {
     return 'EXPIRED';
   }
@@ -271,6 +274,9 @@ function statusBadge(status: ConsentLifecycle): { status: 'ok' | 'warn' | 'error
   }
   if (status === 'REJECTED') {
     return { status: 'error', label: 'Rejected' };
+  }
+  if (status === 'REVOKED') {
+    return { status: 'warn', label: 'Revoked' };
   }
   if (status === 'EXPIRED') {
     return { status: 'warn', label: 'Expired' };
@@ -327,6 +333,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
     onboardUserFromFi,
     refreshFiConsentBinding,
     verifyAssertionSuccess,
+    revokeConsentFromFi,
   } = useConsole();
 
   const [fiOnboarding, setFiOnboarding] = useState(false);
@@ -751,7 +758,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
     }
     if (!hasActiveToken) {
       setSubmitError(
-        `Token required before requesting consent. No ACTIVE token found for wallet user ${resolvedWalletTarget.walletUserId}. Use FI onboarding (or Command Centre issuer onboarding) to create the token.`
+        `Token required before requesting consent. No ACTIVE token found for wallet user ${resolvedWalletTarget.walletUserId}. Use FI onboarding to create the token.`
       );
       return;
     }
@@ -963,7 +970,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs text-rose-900">
                     <p className="font-semibold">Token required before requesting consent</p>
                     <p className="mt-1">
-                      No ACTIVE token found for wallet user {resolvedWalletTarget?.walletUserId}. Use 'Onboard user from FI' below (or Command Centre issuer onboarding) to create an ACTIVE token.
+                      No ACTIVE token found for wallet user {resolvedWalletTarget?.walletUserId}. Use 'Onboard user from FI' below to create an ACTIVE token.
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <button
@@ -1197,7 +1204,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
                     <p className="font-semibold">Create Consent disabled</p>
                     <p className="mt-1">
-                      No ACTIVE token found for wallet user {resolvedWalletTarget?.walletUserId}. Complete FI onboarding here (or use Command Centre) first.
+                      No ACTIVE token found for wallet user {resolvedWalletTarget?.walletUserId}. Complete FI onboarding here first.
                     </p>
                     <Link to={issuerOnboardingPath} className="mt-2 inline-flex items-center gap-1 font-semibold underline">
                       Open Issuer onboarding <ChevronRight className="h-3.5 w-3.5" />
@@ -1555,6 +1562,14 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                     <BadgeCheck className="h-4 w-4" />
                     Verify Assertion
                   </ConsoleButton>
+                  <ConsoleButton
+                    intent="secondary"
+                    onClick={() => void revokeConsentFromFi(selectedConsent.consentId, 'Revoked by FI from FI portal')}
+                    disabled={runningAction !== null || !['PENDING', 'APPROVED'].includes(selectedConsent.status)}
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    Revoke Consent (FI)
+                  </ConsoleButton>
                   {!verifyEnabled ? (
                     <p className="text-xs text-slate-500">
                       Verify is enabled when selected consent is approved and currently active in this FI session.
@@ -1562,6 +1577,9 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   ) : null}
                   {selectedConsent.status === 'REJECTED' ? (
                     <p className="text-xs text-amber-700">Consent is rejected. Verification is skipped.</p>
+                  ) : null}
+                  {selectedConsent.status === 'REVOKED' ? (
+                    <p className="text-xs text-amber-700">Consent is revoked. Verification is blocked.</p>
                   ) : null}
                   {autoVerifyMessage ? <p className="text-xs text-slate-600">{autoVerifyMessage}</p> : null}
                 </div>

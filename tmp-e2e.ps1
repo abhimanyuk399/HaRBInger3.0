@@ -98,7 +98,7 @@ $envMap=Load-EnvMap
 $realm='bharat-kyc-dev'
 $uid=$envMap['VITE_WALLET_OWNER_USER_ID']
 if(-not $uid){ $uid=$envMap['KEYCLOAK_WALLET_OWNER_USER_ID'] }
-if(-not $uid){ $uid='KYC-1234' }
+if(-not $uid){ $uid='wallet-owner-1' }
 
 $walletUser=$envMap['KEYCLOAK_WALLET_OWNER_USER']
 $walletPass=$envMap['KEYCLOAK_WALLET_OWNER_PASSWORD']

@@ -103,7 +103,7 @@ export default function WalletLoginPage() {
               className="kyc-form-input"
               placeholder="wallet-owner-1"
             />
-            <p className="kyc-form-hint">Hint: `wallet-owner-1` or `wallet-nominee`</p>
+            <p className="kyc-form-hint">Hint: `wallet-owner-1` or `wallet-nominee-1`</p>
           </label>
           <label className="kyc-form-field">
             <span className="kyc-form-label">Password</span>

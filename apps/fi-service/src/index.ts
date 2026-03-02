@@ -86,6 +86,13 @@ const renewConsentSchema = z
   })
   .strict();
 
+const revokeConsentSchema = z
+  .object({
+    consentId: z.string().uuid(),
+    reason: z.string().min(1).max(256).optional(),
+  })
+  .strict();
+
 const onboardUserSchema = z
   .object({
     userId: z.string().min(3).max(256),
@@ -428,7 +435,7 @@ app.get(
           .split(',')
           .map((v) => v.trim())
           .filter(Boolean)
-      : ['KYC-1234', 'KYC-5678'];
+      : ['wallet-owner-1', 'wallet-user-2'];
 
     const rows = await Promise.all(
       userIds.map(async (userId) => {
@@ -594,6 +601,125 @@ app.post(
     });
   })
 );
+
+
+app.post(
+  '/v1/fi/revoke-consent',
+  validateAccessToken,
+  requireScopes([...fiServiceScopes.kycRequest]),
+  validateBody(revokeConsentSchema),
+  asyncHandler(async (req, res) => {
+    const consentId = req.body.consentId;
+    const reason = typeof req.body.reason === 'string' && req.body.reason.trim().length > 0 ? req.body.reason.trim() : 'Revoked by FI';
+
+    const fiRequest = await prisma.fiKycRequest.findUnique({
+      where: { consentId },
+    });
+    if (!fiRequest) {
+      await addAuditEvent({
+        eventType: 'KYC_CONSENT_REVOKED_BY_FI',
+        success: false,
+        reason: 'consent_not_found',
+        detail: { consentId, actor: getActor(req) },
+      });
+      return res.status(404).json({ error: 'consent_not_found' });
+    }
+
+    const consent = await prisma.consentRecord.findUnique({
+      where: { id: consentId },
+    });
+    if (!consent) {
+      await addAuditEvent({
+        fiRequestId: fiRequest.id,
+        eventType: 'KYC_CONSENT_REVOKED_BY_FI',
+        success: false,
+        reason: 'consent_not_found',
+        detail: { consentId, actor: getActor(req) },
+      });
+      return res.status(404).json({ error: 'consent_not_found' });
+    }
+
+    if (consent.fiId !== fiRequest.fiId) {
+      await addAuditEvent({
+        fiRequestId: fiRequest.id,
+        eventType: 'KYC_CONSENT_REVOKED_BY_FI',
+        success: false,
+        reason: 'fi_mismatch',
+        detail: { consentId, actor: getActor(req), fiId: fiRequest.fiId, consentFiId: consent.fiId },
+      });
+      return res.status(409).json({ error: 'fi_mismatch' });
+    }
+
+    if (consent.status === 'REVOKED') {
+      return res.json({
+        consentId: consent.id,
+        status: 'REVOKED',
+        fiId: consent.fiId,
+        tokenId: consent.tokenId,
+        alreadyRevoked: true,
+        expiresAt: consent.expiresAt.toISOString(),
+      });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedConsent = await tx.consentRecord.update({
+        where: { id: consent.id },
+        data: {
+          status: 'REVOKED',
+          assertionJwt: null,
+          assertionJti: null,
+        },
+      });
+
+      const updatedRequest = await tx.fiKycRequest.update({
+        where: { consentId: consent.id },
+        data: {
+          status: 'REVOKED',
+        },
+      });
+
+      await tx.consentAuditEvent.create({
+        data: {
+          consentId: consent.id,
+          eventType: 'CONSENT_REVOKED_BY_FI',
+          actor: getActor(req),
+          detail: {
+            fiId: consent.fiId,
+            reason,
+          },
+        },
+      });
+
+      return { updatedConsent, updatedRequest };
+    });
+
+    await addAuditEvent({
+      fiRequestId: updated.updatedRequest.id,
+      eventType: 'KYC_CONSENT_REVOKED_BY_FI',
+      success: true,
+      reason: 'success',
+      detail: {
+        consentId: updated.updatedConsent.id,
+        fiId: updated.updatedConsent.fiId,
+        tokenId: updated.updatedConsent.tokenId,
+        actor: getActor(req),
+        revokeReason: reason,
+      },
+    });
+
+    logger.info({ consentId: updated.updatedConsent.id, fiId: updated.updatedConsent.fiId }, 'fi consent revoked');
+
+    res.json({
+      consentId: updated.updatedConsent.id,
+      status: updated.updatedConsent.status,
+      fiId: updated.updatedConsent.fiId,
+      tokenId: updated.updatedConsent.tokenId,
+      expiresAt: updated.updatedConsent.expiresAt.toISOString(),
+      alreadyRevoked: false,
+    });
+  })
+);
+
 
 app.post(
   '/v1/fi/verify-assertion',
