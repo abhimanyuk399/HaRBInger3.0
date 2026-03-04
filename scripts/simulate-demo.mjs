@@ -30,7 +30,7 @@ async function upsertRegistry(userId, status, daysToExpire = 30, version = 1) {
       issuedAt,
       expiresAt,
       payload: {
-        fullName: userId === 'wallet-owner-1' ? 'Ananya Rao' : `KYC User ${userId}`,
+        fullName: userId === 'KYC-1234' ? 'Ananya Rao' : `KYC User ${userId}`,
         dob: '1990-01-01',
         idNumber: userId,
         email: `${userId.toLowerCase()}@example.local`,
@@ -174,8 +174,8 @@ async function main() {
   await prisma.registryAuditEvent.deleteMany({});
   await prisma.registryRecord.deleteMany({});
 
-  const owner = 'wallet-owner-1';
-  const secondary = 'wallet-user-2';
+  const owner = 'KYC-1234';
+  const secondary = 'KYC-5678';
   const nomineeUser = 'wallet-nominee-1';
 
   const ownerToken = await upsertRegistry(owner, 'ACTIVE', 5, 2);

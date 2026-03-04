@@ -156,8 +156,8 @@ async function addReviewAuditEvent(input: {
 }
 
 async function resetDemoData() {
-  const ownerUserId = 'wallet-owner-1';
-  const otherUserId = 'wallet-user-2';
+  const ownerUserId = 'KYC-1234';
+  const otherUserId = 'KYC-5678';
   const nomineeUserId = 'wallet-nominee-1';
   const fiDemoId = 'FI-DEMO-01';
 
@@ -180,8 +180,8 @@ async function resetDemoData() {
 
 
 async function seedDemoData(actor: string) {
-  const ownerUserId = 'wallet-owner-1';
-  const otherUserId = 'wallet-user-2';
+  const ownerUserId = 'KYC-1234';
+  const otherUserId = 'KYC-5678';
   const nomineeUserId = 'wallet-nominee-1';
   const fiDemoId = 'FI-DEMO-01';
   const issuerId = 'issuer-demo';

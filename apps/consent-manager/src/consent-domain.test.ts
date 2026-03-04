@@ -7,7 +7,7 @@ describe('selective disclosure', () => {
     const fullPayload = {
       fullName: 'Ananya Rao',
       dob: '1995-01-12',
-      idNumber: 'wallet-owner-1',
+      idNumber: 'KYC-1234',
       email: 'ananya@example.com',
       phone: '+9100000000',
     };

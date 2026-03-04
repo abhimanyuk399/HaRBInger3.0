@@ -4,13 +4,15 @@ const adminUser = process.env.KEYCLOAK_ADMIN ?? 'admin';
 const adminPassword = process.env.KEYCLOAK_ADMIN_PASSWORD ?? 'admin';
 const walletOwnerUser = process.env.KEYCLOAK_WALLET_OWNER_USER ?? 'wallet-owner-1';
 const walletOwnerPassword = process.env.KEYCLOAK_WALLET_OWNER_PASSWORD ?? 'wallet-owner-1-pass';
-const nomineeUser = process.env.KEYCLOAK_NOMINEE_USER ?? 'wallet-nominee-1';
-const nomineePassword = process.env.KEYCLOAK_NOMINEE_PASSWORD ?? 'wallet-nominee-1-pass';
+const nomineeUser = process.env.KEYCLOAK_NOMINEE_USER ?? 'wallet-nominee';
+const nomineePassword = process.env.KEYCLOAK_NOMINEE_PASSWORD ?? 'wallet-nominee-pass';
 const fiUser1 = process.env.KEYCLOAK_FI_USER_1 ?? 'fi-analyst-1';
 const fiPassword1 = process.env.KEYCLOAK_FI_PASSWORD_1 ?? 'fi-analyst-1-pass';
 const fiUser2 = process.env.KEYCLOAK_FI_USER_2 ?? 'fi-analyst-2';
 const fiPassword2 = process.env.KEYCLOAK_FI_PASSWORD_2 ?? 'fi-analyst-2-pass';
-const walletOwnerUserId = process.env.KEYCLOAK_WALLET_OWNER_USER_ID ?? process.env.VITE_WALLET_OWNER_USER_ID ?? 'wallet-owner-1';
+const commandAdminUser = process.env.KEYCLOAK_COMMAND_ADMIN_USER ?? 'admin';
+const commandAdminPassword = process.env.KEYCLOAK_COMMAND_ADMIN_PASSWORD ?? 'admin';
+const walletOwnerUserId = process.env.KEYCLOAK_WALLET_OWNER_USER_ID ?? process.env.VITE_WALLET_OWNER_USER_ID ?? 'KYC-1234';
 const walletNomineeUserId = process.env.KEYCLOAK_WALLET_NOMINEE_USER_ID ?? nomineeUser;
 const fiServiceClientId = process.env.KEYCLOAK_FI_CLIENT_ID ?? 'fi-client';
 const fiServiceClientSecret = process.env.KEYCLOAK_FI_CLIENT_SECRET ?? 'fi-client-secret';
@@ -538,6 +540,13 @@ async function main() {
     lastName: 'Analyst Two',
     email: `${fiUser2}@example.local`,
   });
+  const commandAdmin = await ensureUser(adminToken, {
+    username: commandAdminUser,
+    password: commandAdminPassword,
+    firstName: 'Command',
+    lastName: 'Admin',
+    email: `${commandAdminUser}@example.local`,
+  });
 
   const walletUserRole = await ensureRealmRole(adminToken, 'wallet_user', 'Wallet owner access');
   const walletNomineeRole = await ensureRealmRole(adminToken, 'wallet_nominee', 'Wallet nominee delegation access');
@@ -548,6 +557,7 @@ async function main() {
   await assignRealmRoles(adminToken, walletNominee.id, [walletNomineeRole]);
   await assignRealmRoles(adminToken, fiAnalyst1.id, [fiUserRole]);
   await assignRealmRoles(adminToken, fiAnalyst2.id, [fiUserRole]);
+  await assignRealmRoles(adminToken, commandAdmin.id, [adminRole]);
 
   console.log('[keycloak-bootstrap] complete');
 }

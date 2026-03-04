@@ -6,7 +6,7 @@ import { ActivityTimeline } from '../components/ActivityTimeline';
 import { CopyValueField } from '../components/CopyValueField';
 import { ConsoleButton } from '../components/ConsoleButton';
 import { ConsoleCard } from '../components/ConsoleCard';
-import { FI_ANALYST_2_USERNAME, FI_OPTIONS, KNOWN_WALLET_TARGETS, displayWalletIdentity } from '../identityConfig';
+import { FI_ANALYST_2_USERNAME, FI_OPTIONS, KNOWN_WALLET_TARGETS, displayWalletIdentity, fiUsernameToClientId } from '../identityConfig';
 import { InfoTooltip } from '../components/InfoTooltip';
 import { PortalPageHeader } from '../components/PortalPageHeader';
 import { SectionHeader } from '../components/SectionHeader';
@@ -163,7 +163,7 @@ function toConsentCreateErrorMessage(error: unknown) {
   const fallbackMessage = error.message || 'Failed to create consent.';
   const fallbackLower = fallbackMessage.toLowerCase();
   if (fallbackLower.includes('token_not_found') || fallbackLower.includes('no_active_token') || fallbackLower.includes('token required')) {
-    return "Token required before requesting consent. Use 'Onboard user from FI' below to create an ACTIVE token.";
+    return "Token required before requesting consent. Use 'Onboard user from FI' below  to create an ACTIVE token.";
   }
   if (fallbackLower.includes('consent_expired')) {
     return 'Consent has expired. Create a renewal request with updated expiry.';
@@ -333,14 +333,19 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
     onboardUserFromFi,
     refreshFiConsentBinding,
     verifyAssertionSuccess,
-    revokeConsentFromFi,
+    revokeFiConsent,
   } = useConsole();
 
   const [fiOnboarding, setFiOnboarding] = useState(false);
 
+  useEffect(() => {
+    if (!activeFiUsername) return;
+    setActingFiId(fiUsernameToClientId(activeFiUsername) as (typeof FI_OPTIONS)[number]['id']);
+  }, [activeFiUsername]);
+
   const [walletTargetInput, setWalletTargetInput] = useState(KNOWN_WALLET_TARGETS[0]?.userId ?? '');
   const [customerCkycId, setCustomerCkycId] = useState('');
-  const [actingFiId, setActingFiId] = useState<(typeof FI_OPTIONS)[number]['id']>(FI_OPTIONS[0]?.id ?? '');
+  const [actingFiId, setActingFiId] = useState<(typeof FI_OPTIONS)[number]['id']>(() => (activeFiUsername ? fiUsernameToClientId(activeFiUsername) : (FI_OPTIONS[0]?.id ?? '')) as (typeof FI_OPTIONS)[number]['id']);
   const [purposeOption, setPurposeOption] = useState<PurposeOption>('Account Opening');
   const [customPurpose, setCustomPurpose] = useState('');
   const [purposeDescription, setPurposeDescription] = useState('');
@@ -386,8 +391,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
       : undefined;
   const walletOpsBasePath = '/wallet/ops';
   const auditBasePath = '/command/audit';
-  const issuerOnboardingPath = '/command/operations#issuer-onboarding';
-  const activeWalletToken = useMemo(
+    const activeWalletToken = useMemo(
     () => walletTokens.find((token) => String(token.status ?? '').toUpperCase() === 'ACTIVE') ?? null,
     [walletTokens]
   );
@@ -758,7 +762,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
     }
     if (!hasActiveToken) {
       setSubmitError(
-        `Token required before requesting consent. No ACTIVE token found for wallet user ${resolvedWalletTarget.walletUserId}. Use FI onboarding to create the token.`
+        `Token required before requesting consent. No ACTIVE token found for wallet user ${resolvedWalletTarget.walletUserId}. Use FI onboarding  to create the token.`
       );
       return;
     }
@@ -934,17 +938,9 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
 
                 <label className="mt-3 block text-xs font-semibold text-slate-700">
                   Acting FI
-                  <select
-                    value={actingFiId}
-                    onChange={(event) => setActingFiId(event.target.value as (typeof FI_OPTIONS)[number]['id'])}
-                    className="mt-1 kyc-form-select kyc-form-input-sm"
-                  >
-                    {FI_OPTIONS.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label} ({option.id})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="mt-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800">
+                    {selectedFiLabel} ({actingFiId})
+                  </div>
                 </label>
 
                 <div className="mt-2 flex items-center gap-2 text-xs text-slate-600">
@@ -990,12 +986,6 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                       >
                         {fiOnboarding ? 'Onboarding...' : 'Onboard user from FI'}
                       </button>
-                      <Link
-                        to={issuerOnboardingPath}
-                        className="inline-flex items-center gap-1 font-semibold text-rose-900 underline"
-                      >
-                        Open Issuer onboarding <ChevronRight className="h-3.5 w-3.5" />
-                      </Link>
                     </div>
                   </div>
                 ) : null}
@@ -1104,7 +1094,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">4) Policy and options</p>
-                <p className="mt-2 text-xs font-semibold text-slate-700">Approval policy</p>
+                <p className="mt-2 text-xs font-semibold text-slate-700">Approval route request (wallet policy enforced)</p>
                 <label className="mt-1 flex items-center gap-2 text-xs text-slate-700">
                   <input type="radio" name="approval-policy" checked={approvalPolicy === 'owner'} onChange={() => setApprovalPolicy('owner')} />
                   Owner can approve
@@ -1125,10 +1115,10 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                 </label>
                 <p className="mt-1 text-xs text-slate-600">
                   {approvalPolicy === 'delegation_required'
-                    ? 'Consent will be created with delegation required policy.'
+                    ? 'FI is requesting delegate/guardian approval. Wallet/delegation controls still enforce eligibility and audit.'
                     : approvalPolicy === 'either'
-                      ? 'Consent allows owner or nominee path, based on active delegation policy.'
-                      : 'Owner can approve directly.'}
+                      ? 'FI requests owner-or-nominee approval. Final enforcement depends on wallet delegation policy and user context.'
+                      : 'FI requests owner approval; wallet may still require guardian/delegate for protected user cases.'}
                 </p>
                 <label className="mt-2 flex items-center gap-2 text-xs text-slate-700">
                   <input
@@ -1206,9 +1196,6 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                     <p className="mt-1">
                       No ACTIVE token found for wallet user {resolvedWalletTarget?.walletUserId}. Complete FI onboarding here first.
                     </p>
-                    <Link to={issuerOnboardingPath} className="mt-2 inline-flex items-center gap-1 font-semibold underline">
-                      Open Issuer onboarding <ChevronRight className="h-3.5 w-3.5" />
-                    </Link>
                   </div>
                 ) : null}
                 {submitError ? <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">{submitError}</div> : null}
@@ -1285,7 +1272,7 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
           <ConsoleCard id="fi-consent-inbox" className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))]">
             <SectionHeader title="Consent Queue" subtitle="Filter and open consents by status, wallet, or purpose." />
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              {(['all', 'pending', 'approved', 'rejected', 'expired'] as const).map((status) => (
+              {(['all', 'pending', 'approved', 'rejected', 'revoked', 'expired'] as const).map((status) => (
                 <button
                   key={status}
                   type="button"
@@ -1564,10 +1551,9 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   </ConsoleButton>
                   <ConsoleButton
                     intent="secondary"
-                    onClick={() => void revokeConsentFromFi(selectedConsent.consentId, 'Revoked by FI from FI portal')}
-                    disabled={runningAction !== null || !['PENDING', 'APPROVED'].includes(selectedConsent.status)}
+                    onClick={() => void revokeFiConsent(selectedConsent.consentId, 'Revoked by FI from FI Portal')}
+                    disabled={runningAction !== null || !['PENDING','APPROVED'].includes(selectedConsent.status)}
                   >
-                    <ShieldCheck className="h-4 w-4" />
                     Revoke Consent (FI)
                   </ConsoleButton>
                   {!verifyEnabled ? (
@@ -1577,9 +1563,6 @@ export default function FiConsolePage({ mode = 'all' }: FiConsolePageProps) {
                   ) : null}
                   {selectedConsent.status === 'REJECTED' ? (
                     <p className="text-xs text-amber-700">Consent is rejected. Verification is skipped.</p>
-                  ) : null}
-                  {selectedConsent.status === 'REVOKED' ? (
-                    <p className="text-xs text-amber-700">Consent is revoked. Verification is blocked.</p>
                   ) : null}
                   {autoVerifyMessage ? <p className="text-xs text-slate-600">{autoVerifyMessage}</p> : null}
                 </div>

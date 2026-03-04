@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronRight, LogIn, LogOut, Menu, Moon, Search, Sun, Bell, Shield, UserCircle2, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ChevronRight, LogIn, LogOut, Menu, Moon, Search, Sun, Bell, Shield } from 'lucide-react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useConsole } from './ConsoleContext';
@@ -37,7 +37,6 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => { try { return (localStorage.getItem('bharatkyc:theme') as 'dark' | 'light') || 'light'; } catch { return 'light'; } });
   const [activityTrayOpen, setActivityTrayOpen] = useState(false);
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
   const [lastActivityAt, setLastActivityAt] = useState<number>(() => Date.now());
   const {
@@ -105,8 +104,6 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
           : 'Wallet: signed out';
 
   const primaryIdentity = portalType === 'fi' ? activeFiUsername : activeWalletUsername;
-  const recentFlashEvents = (flashMessages ?? []).slice(0, 5);
-  const currentWorkspaceLabel = portalType === 'command' ? 'Command workspace' : portalType === 'wallet' ? 'Wallet workspace' : 'FI workspace';
 
   return (
     <div data-kyc-theme={theme} className={cn('min-h-screen', themeClasses.appBg, theme === 'dark' ? 'kyc-shell-dark' : 'kyc-shell-light')}>
@@ -274,77 +271,11 @@ function PortalShell({ title, subtitle, navItems, quickLinks, portalType, portal
                   className={cn('h-9 w-full rounded-lg border px-8 text-sm outline-none focus:border-violet-400', themeClasses.searchWrap)}
                 />
               </div>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setProfileMenuOpen((v) => !v)}
-                  className={cn('inline-flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-left', theme==='dark' ? 'border-slate-700 bg-slate-900/60 text-slate-100' : 'border-slate-200 bg-white text-slate-800')}
-                  aria-haspopup="menu"
-                  aria-expanded={profileMenuOpen}
-                  title="Profile, theme, notifications and logout"
-                >
-                  <UserCircle2 className="h-7 w-7 text-violet-300" />
-                  <div className="hidden sm:block">
-                    <p className="text-xs font-semibold leading-tight">{displayWalletIdentity(primaryIdentity, 'operator')}</p>
-                    <p className="text-[11px] opacity-80">{currentWorkspaceLabel}</p>
-                  </div>
-                  <span className={cn('inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold', theme==='dark' ? 'bg-violet-500/20 text-violet-200' : 'bg-violet-100 text-violet-700')}>{flashMessages.length}</span>
-                  <ChevronDown className="h-4 w-4 opacity-80" />
-                </button>
-
-                {profileMenuOpen ? (
-                  <>
-                    <button type="button" className="fixed inset-0 z-30" onClick={() => setProfileMenuOpen(false)} aria-label="Close profile menu" />
-                    <div className={cn('absolute right-0 top-12 z-40 w-[min(360px,92vw)] rounded-2xl border p-3 shadow-2xl', theme==='dark' ? 'border-slate-700 bg-slate-950/95 text-slate-100' : 'border-slate-200 bg-white text-slate-900')}>
-                      <div className={cn('rounded-xl border p-3', theme==='dark' ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50')}>
-                        <div className="flex items-center gap-3">
-                          <UserCircle2 className="h-10 w-10 text-violet-400" />
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{displayWalletIdentity(primaryIdentity, 'operator')}</p>
-                            <p className="text-xs opacity-80">{currentWorkspaceLabel}</p>
-                            <p className="mt-0.5 text-[11px] opacity-70">{sessionSummary}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <button type="button" onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} className={cn('inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold', theme==='dark' ? 'border-white/10 bg-white/[0.04] hover:bg-white/[0.08]' : 'border-slate-200 bg-white hover:bg-slate-50')}>
-                          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                          Theme: {theme === 'dark' ? 'Light' : 'Dark'}
-                        </button>
-                        <button type="button" onClick={() => { setActivityTrayOpen(true); setProfileMenuOpen(false); }} className={cn('inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold', theme==='dark' ? 'border-white/10 bg-white/[0.04] hover:bg-white/[0.08]' : 'border-slate-200 bg-white hover:bg-slate-50')}>
-                          <Bell className="h-4 w-4" />
-                          Notifications
-                        </button>
-                      </div>
-
-                      <div className="mt-3">
-                        <div className="mb-2 flex items-center justify-between">
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em] opacity-70">Flash events</p>
-                          <span className="text-[11px] opacity-60">{recentFlashEvents.length}</span>
-                        </div>
-                        <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
-                          {recentFlashEvents.length === 0 ? (
-                            <div className={cn('rounded-xl border px-3 py-2 text-xs', theme==='dark' ? 'border-white/10 bg-white/[0.03] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600')}>No recent flash events</div>
-                          ) : recentFlashEvents.map((m) => (
-                            <div key={m.id} className={cn('rounded-xl border px-3 py-2', theme==='dark' ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50')}>
-                              <p className="text-xs font-semibold">{m.message || 'Activity event'}</p>
-                              {m.detail ? <p className="mt-0.5 text-[11px] opacity-75">{m.detail}</p> : null}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className={cn('mt-3 flex items-center justify-between gap-2 border-t pt-3', theme==='dark' ? 'border-white/10' : 'border-slate-200')}>
-                        <button type="button" onClick={() => { setProfileMenuOpen(false); if (portalType === 'fi') { void logoutFi('/fi/login'); } else if (portalType === 'wallet') { void logoutWallet('/wallet/login'); } else if (COMMAND_PORTAL_ADMIN_LOGIN_REQUIRED) { void logoutWallet('/command/login'); } }} className={cn('inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold', theme==='dark' ? 'border-rose-300/20 bg-rose-400/10 text-rose-200 hover:bg-rose-400/15' : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100')}>
-                          <LogOut className="h-4 w-4" />
-                          Logout
-                        </button>
-                        <button type="button" onClick={() => setProfileMenuOpen(false)} className={cn('inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold', theme==='dark' ? 'border-white/10 bg-white/[0.04] hover:bg-white/[0.08]' : 'border-slate-200 bg-white hover:bg-slate-50')}>Close</button>
-                      </div>
-                    </div>
-                  </>
-                ) : null}
+              <div className="rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-1.5 text-right">
+                <p className="text-xs font-semibold text-slate-100">{displayWalletIdentity(primaryIdentity, 'operator')}</p>
+                <p className="text-[11px] text-slate-400">
+                  {portalType === 'command' ? 'Command workspace' : portalType === 'wallet' ? 'Wallet workspace' : 'FI workspace'}
+                </p>
               </div>
             </div>
 
@@ -493,7 +424,7 @@ export function CommandPortalLayout() {
   return (
     <PortalShell
       title="Bharat KYC T - Command Centre"
-      subtitle="Bird’s-eye operational visibility across services. Use FI/Wallet portals for customer-facing actions."
+      subtitle="Bird’s-eye operational visibility only. Execute customer/FI actions from Wallet and FI portals."
       navItems={commandNavItems}
       quickLinks={commandQuickLinks}
       portalType="command"

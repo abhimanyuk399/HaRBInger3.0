@@ -326,7 +326,7 @@ interface ConsoleContextValue {
   revokeToken: () => Promise<void>;
   verifyExpectedFailure: (expectedErrorCode: string) => Promise<void>;
   renewConsent: () => Promise<void>;
-  revokeConsentFromFi: (targetConsentId?: string, reason?: string) => Promise<void>;
+  revokeFiConsent: (targetConsentId?: string, reason?: string) => Promise<void>;
   runFi2Reuse: () => Promise<void>;
   addNomineeDelegation: (options?: {
     ownerUserId?: string;
@@ -691,6 +691,12 @@ function toFriendlyErrorMessage(input: {
   }
   if (code === 'invalid_client_credentials') {
     return 'Keycloak client credentials are invalid. Verify FI client secret/client-id configuration.';
+  }
+  if (code === 'ISSUER_ISSUE_FAILED' || code === 'issuer_issue_failed') {
+    return 'FI onboarding could not issue a token via issuer-service. Check fi-service -> issuer-service connectivity and issuer-admin client credentials.';
+  }
+  if (code === 'service_token_fetch_failed' || code === 'SERVICE_TOKEN_FETCH_FAILED') {
+    return 'FI service could not obtain service token. Check Keycloak client secret / realm client setup for fi-service.';
   }
 
   if (input.status === 401) {
@@ -2028,58 +2034,37 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
     }
   }, [apiCall, consentExpiredObserved, consentId, pushActivity, requireFiToken, setCoverageFlag, verificationResults]);
 
+  const revokeFiConsent = useCallback(async (targetConsentId?: string, reason?: string) => {
+    const consentToRevoke = (targetConsentId ?? consentId ?? '').trim();
+    if (!consentToRevoke) {
+      throw new Error('Select a consent first.');
+    }
+    setRunningAction('fi-revoke-consent');
+    setStatusMessage('Revoking consent from FI...');
+    try {
+      const fiToken = await requireFiToken();
+      const response = await apiCall<{ consentId: string; status: string; tokenId?: string; fiId?: string }>({
+        service: 'fi',
+        title: 'FI Revoke Consent',
+        method: 'POST',
+        path: routeFor(api.fi, '/v1/fi/revoke-consent'),
+        token: fiToken ?? undefined,
+        body: { consentId: consentToRevoke, ...(reason ? { reason } : {}) },
+      });
 
-  const revokeConsentFromFi = useCallback(
-    async (targetConsentId?: string, reason?: string) => {
-      const resolvedConsentId = targetConsentId ?? consentId;
-      if (!resolvedConsentId) {
-        throw new Error('Select a consent first.');
+      setWalletConsents((previous) => previous.map((item) =>
+        item.consentId === consentToRevoke ? normalizeWalletConsentView({ ...item, status: response.status }) : item
+      ));
+      if (consentId === consentToRevoke) {
+        setConsentStatus(response.status);
       }
-      setRunningAction('fi-revoke-consent');
-      setStatusMessage('Revoking FI consent...');
-      try {
-        const fiToken = await requireFiToken();
-        const revoked = await apiCall<{ consentId: string; status: string; expiresAt?: string }>({
-          service: 'fi',
-          title: 'FI Revoke Consent',
-          method: 'POST',
-          path: routeFor(api.fi, '/v1/fi/revoke-consent'),
-          token: fiToken ?? undefined,
-          body: {
-            consentId: resolvedConsentId,
-            reason: reason ?? 'Revoked by FI',
-          },
-        });
-
-        if (resolvedConsentId === consentId) {
-          setConsentStatus(revoked.status);
-          setAssertionJwt(null);
-          if (revoked.expiresAt) {
-            setConsentExpiresAt(revoked.expiresAt);
-          }
-        }
-
-        setWalletConsents((previous) =>
-          previous.map((item) =>
-            item.consentId === revoked.consentId
-              ? { ...item, status: revoked.status, expiresAt: revoked.expiresAt ?? item.expiresAt }
-              : item
-          )
-        );
-
-        pushActivity({
-          service: 'fi',
-          label: 'CONSENT_REVOKED_BY_FI',
-          status: 'warn',
-          detail: { consentId: revoked.consentId, reason: reason ?? 'Revoked by FI' },
-        });
-        setStatusMessage(`FI consent revoked: ${revoked.consentId}`);
-      } finally {
-        setRunningAction(null);
-      }
-    },
-    [apiCall, consentId, pushActivity, requireFiToken]
-  );
+      pushActivity({ service: 'fi', label: 'FI_CONSENT_REVOKED', status: 'success', detail: { consentId: consentToRevoke, reason: reason ?? 'fi_revoked' } });
+      await refreshWalletConsents();
+      setStatusMessage(`Consent revoked from FI: ${consentToRevoke}`);
+    } finally {
+      setRunningAction(null);
+    }
+  }, [api, apiCall, consentId, pushActivity, refreshWalletConsents, requireFiToken]);
 
   const runFi2Reuse = useCallback(async () => {
     if (!tokenId) {
@@ -2388,7 +2373,9 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
       setStatusMessage('Onboarding user from FI portal...');
       try {
         const fiToken = await requireFiToken();
-        const result = await apiCall<{ tokenId: string; status: string; alreadyActive?: boolean }>({
+        let result: { tokenId: string; status: string; alreadyActive?: boolean };
+        try {
+          result = await apiCall<{ tokenId: string; status: string; alreadyActive?: boolean }>({
           service: 'fi',
           title: 'FI Onboard User',
           method: 'POST',
@@ -2398,6 +2385,15 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
             userId: normalizedUserId,
           },
         });
+        } catch (error) {
+          // Fallback: if FI onboard completed but response failed, surface any ACTIVE token now visible.
+          const activeNow = await checkActiveTokenForUser(normalizedUserId).catch(() => null);
+          if (activeNow && String(activeNow.status ?? '').toUpperCase() === 'ACTIVE') {
+            result = { tokenId: activeNow.tokenId, status: 'ACTIVE', alreadyActive: true };
+          } else {
+            throw error;
+          }
+        }
 
         const mappedToken: WalletTokenView = {
           tokenId: result.tokenId,
@@ -2417,7 +2413,7 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
         setRunningAction(null);
       }
     },
-    [apiCall, pushActivity, requireFiToken]
+    [apiCall, checkActiveTokenForUser, pushActivity, requireFiToken]
   );
 
   const refreshFiConsentBinding = useCallback(
@@ -3438,7 +3434,7 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
       revokeToken,
       verifyExpectedFailure,
       renewConsent,
-      revokeConsentFromFi,
+      revokeFiConsent,
       runFi2Reuse,
       addNomineeDelegation,
       revokeDelegation,
@@ -3524,7 +3520,7 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
       registryAudit,
       registrySnapshot,
       renewConsent,
-      revokeConsentFromFi,
+      revokeFiConsent,
       requestConsent,
       resetCoverage,
       reviewRun,

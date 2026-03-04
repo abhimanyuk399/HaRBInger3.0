@@ -78,10 +78,11 @@ export default function CommandLoginPage() {
       <div className="space-y-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-950">Welcome back</h2>
-          <p className="mt-1 text-sm text-slate-600">Sign in with Command Centre admin credentials to access operational workflows.</p>
+          <p className="mt-1 text-sm text-slate-600">Command Centre can run in read-only mode or require admin authentication.</p>
         </div>
 
-        <div className="grid gap-3">
+        {COMMAND_PORTAL_ADMIN_LOGIN_REQUIRED ? (
+          <div className="grid gap-3">
             <label className="kyc-form-field">
               <span className="kyc-form-label">Username</span>
               <input
@@ -90,9 +91,9 @@ export default function CommandLoginPage() {
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 className="kyc-form-input"
-                placeholder="wallet-owner-1"
+                placeholder="admin"
               />
-              <p className="kyc-form-hint">Hint: command admin user is `wallet-owner-1`</p>
+              <p className="kyc-form-hint">Hint: command admin user is `admin`</p>
             </label>
             <label className="kyc-form-field">
               <span className="kyc-form-label">Password</span>
@@ -109,7 +110,7 @@ export default function CommandLoginPage() {
                     }
                   }}
                   className="kyc-form-input pr-16"
-                  placeholder="wallet-owner-1-pass"
+                  placeholder="admin"
                 />
                 <button
                   type="button"
@@ -119,9 +120,10 @@ export default function CommandLoginPage() {
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
-              <p className="kyc-form-hint">Hint: demo password format `&lt;username&gt;-pass`</p>
+              <p className="kyc-form-hint">Hint: demo command admin password is `admin` (or your configured Keycloak command admin password)</p>
             </label>
           </div>
+        ) : null}
 
         <StatusPill
           status={adminActive ? 'ok' : 'warn'}
@@ -163,7 +165,8 @@ export default function CommandLoginPage() {
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        {COMMAND_PORTAL_ADMIN_LOGIN_REQUIRED ? (
+          <div className="flex flex-wrap items-center gap-2">
             {authenticated && adminRoleGranted ? (
               <ConsoleButton type="button" className="min-w-[180px]" intent="secondary" onClick={() => void logoutWallet('/command/login')}>
                 Logout admin
@@ -190,6 +193,7 @@ export default function CommandLoginPage() {
               </>
             )}
           </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           <Link

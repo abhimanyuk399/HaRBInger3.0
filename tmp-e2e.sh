@@ -339,7 +339,7 @@ FI2_SECRET="$(env_get KEYCLOAK_FI2_CLIENT_SECRET)"
 ISSUER_SECRET="$(env_get ISSUER_ADMIN_CLIENT_SECRET)"
 
 [[ -z "$UID_VALUE" ]] && UID_VALUE="$(env_get KEYCLOAK_WALLET_OWNER_USER_ID)"
-[[ -z "$UID_VALUE" ]] && UID_VALUE="wallet-owner-1"
+[[ -z "$UID_VALUE" ]] && UID_VALUE="KYC-1234"
 [[ -z "$FI_CLIENT_ID" ]] && FI_CLIENT_ID="fi-client"
 [[ -z "$FI2_CLIENT_ID" ]] && FI2_CLIENT_ID="fi-client-2"
 
@@ -353,7 +353,7 @@ FI_ACCESS="$(get_client_access_token "$REALM" "$FI_CLIENT_ID" "$FI_SECRET")" || 
 FI2_ACCESS="$(get_client_access_token "$REALM" "$FI2_CLIENT_ID" "$FI2_SECRET")" || exit 1
 WALLET_ACCESS="$(get_user_access_token "$REALM" "wallet-client" "$WALLET_USER" "$WALLET_PASS" "$WALLET_REDIRECT_URI")" || exit 1
 NOMINEE_ACCESS="$(get_user_access_token "$REALM" "wallet-client" "$NOMINEE_USER" "$NOMINEE_PASS" "$WALLET_REDIRECT_URI")" || exit 1
-WALLET_ACTOR_ID="$(detect_wallet_actor_id "$WALLET_ACCESS" "$UID_VALUE" "$UID_VALUE" "$WALLET_USER" "wallet-owner-1")"
+WALLET_ACTOR_ID="$(detect_wallet_actor_id "$WALLET_ACCESS" "$UID_VALUE" "$UID_VALUE" "$WALLET_USER" "KYC-1234")"
 
 S1_CONSENT_ID=""
 S1_ASSERTION_JWT=""

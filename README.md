@@ -27,7 +27,7 @@ Default local credentials:
 - Keycloak URL: `http://localhost:8080`
 - Realm: `bharat-kyc-dev`
 - Wallet owner: `wallet-owner-1` / `wallet-owner-1-pass`
-- Wallet nominee: `wallet-nominee-1` / `wallet-nominee-1-pass`
+- Wallet nominee: `wallet-nominee` / `wallet-nominee-pass`
 
 ## What's Implemented (Checklist)
 - Token Issuance
@@ -53,8 +53,8 @@ Default local credentials:
   - username: `wallet-owner-1`
   - password: `wallet-owner-1-pass`
 - Dev nominee login:
-  - username: `wallet-nominee-1`
-  - password: `wallet-nominee-1-pass`
+  - username: `wallet-nominee`
+  - password: `wallet-nominee-pass`
 - Redirect URIs configured for `wallet-client`:
   - `http://localhost:5173/*`
 - Portal auth note:

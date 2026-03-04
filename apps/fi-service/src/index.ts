@@ -89,7 +89,7 @@ const renewConsentSchema = z
 const revokeConsentSchema = z
   .object({
     consentId: z.string().uuid(),
-    reason: z.string().min(1).max(256).optional(),
+    reason: z.string().min(1).max(512).optional(),
   })
   .strict();
 
@@ -361,8 +361,6 @@ app.post(
         nonce: consentPayload.nonce,
         status: 'PENDING',
       },
-    });
-
     await addAuditEvent({
       fiRequestId: fiRequest.id,
       eventType: 'KYC_REQUEST_CREATED',
@@ -602,124 +600,73 @@ app.post(
   })
 );
 
-
 app.post(
   '/v1/fi/revoke-consent',
   validateAccessToken,
   requireScopes([...fiServiceScopes.kycRequest]),
   validateBody(revokeConsentSchema),
   asyncHandler(async (req, res) => {
-    const consentId = req.body.consentId;
-    const reason = typeof req.body.reason === 'string' && req.body.reason.trim().length > 0 ? req.body.reason.trim() : 'Revoked by FI';
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+      return res.status(401).json({ error: 'missing_bearer_token' });
+    }
 
-    const fiRequest = await prisma.fiKycRequest.findUnique({
-      where: { consentId },
-    });
+    const fiRequest = await prisma.fiKycRequest.findUnique({ where: { consentId: req.body.consentId } });
     if (!fiRequest) {
-      await addAuditEvent({
-        eventType: 'KYC_CONSENT_REVOKED_BY_FI',
-        success: false,
-        reason: 'consent_not_found',
-        detail: { consentId, actor: getActor(req) },
-      });
       return res.status(404).json({ error: 'consent_not_found' });
     }
 
-    const consent = await prisma.consentRecord.findUnique({
-      where: { id: consentId },
-    });
-    if (!consent) {
+    let revokeResponse: Response;
+    try {
+      revokeResponse = await fetch(`${consentManagerUrl.replace(/\/$/, '')}/v1/consent/${encodeURIComponent(req.body.consentId)}/revoke`, {
+        method: 'POST',
+        headers: {
+          authorization,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ reason: req.body.reason ?? 'fi_revoked_consent' }),
+      });
+    } catch {
       await addAuditEvent({
         fiRequestId: fiRequest.id,
-        eventType: 'KYC_CONSENT_REVOKED_BY_FI',
+        eventType: 'KYC_CONSENT_REVOKED',
         success: false,
-        reason: 'consent_not_found',
-        detail: { consentId, actor: getActor(req) },
+        reason: 'consent_manager_unreachable',
+        detail: { consentId: req.body.consentId, actor: getActor(req) },
       });
-      return res.status(404).json({ error: 'consent_not_found' });
+      return res.status(502).json({ error: 'consent_manager_unreachable' });
     }
 
-    if (consent.fiId !== fiRequest.fiId) {
+    if (!revokeResponse.ok) {
+      const payloadText = await revokeResponse.text();
       await addAuditEvent({
         fiRequestId: fiRequest.id,
-        eventType: 'KYC_CONSENT_REVOKED_BY_FI',
+        eventType: 'KYC_CONSENT_REVOKED',
         success: false,
-        reason: 'fi_mismatch',
-        detail: { consentId, actor: getActor(req), fiId: fiRequest.fiId, consentFiId: consent.fiId },
+        reason: `consent_revoke_failed_${revokeResponse.status}`,
+        detail: { consentId: req.body.consentId, actor: getActor(req) },
       });
-      return res.status(409).json({ error: 'fi_mismatch' });
+      return res.status(revokeResponse.status).json({ error: 'consent_revoke_failed', detail: payloadText });
     }
 
-    if (consent.status === 'REVOKED') {
-      return res.json({
-        consentId: consent.id,
-        status: 'REVOKED',
-        fiId: consent.fiId,
-        tokenId: consent.tokenId,
-        alreadyRevoked: true,
-        expiresAt: consent.expiresAt.toISOString(),
-      });
-    }
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const updatedConsent = await tx.consentRecord.update({
-        where: { id: consent.id },
-        data: {
-          status: 'REVOKED',
-          assertionJwt: null,
-          assertionJti: null,
-        },
-      });
-
-      const updatedRequest = await tx.fiKycRequest.update({
-        where: { consentId: consent.id },
-        data: {
-          status: 'REVOKED',
-        },
-      });
-
-      await tx.consentAuditEvent.create({
-        data: {
-          consentId: consent.id,
-          eventType: 'CONSENT_REVOKED_BY_FI',
-          actor: getActor(req),
-          detail: {
-            fiId: consent.fiId,
-            reason,
-          },
-        },
-      });
-
-      return { updatedConsent, updatedRequest };
-    });
-
+    const revokedConsent = (await revokeResponse.json()) as { consentId?: string; status?: string; tokenId?: string; fiId?: string; };
+    await prisma.fiKycRequest.update({ where: { id: fiRequest.id }, data: { status: 'REVOKED' } });
     await addAuditEvent({
-      fiRequestId: updated.updatedRequest.id,
-      eventType: 'KYC_CONSENT_REVOKED_BY_FI',
+      fiRequestId: fiRequest.id,
+      eventType: 'KYC_CONSENT_REVOKED',
       success: true,
       reason: 'success',
-      detail: {
-        consentId: updated.updatedConsent.id,
-        fiId: updated.updatedConsent.fiId,
-        tokenId: updated.updatedConsent.tokenId,
-        actor: getActor(req),
-        revokeReason: reason,
-      },
+      detail: { consentId: req.body.consentId, actor: getActor(req), status: revokedConsent.status ?? 'REVOKED' },
     });
 
-    logger.info({ consentId: updated.updatedConsent.id, fiId: updated.updatedConsent.fiId }, 'fi consent revoked');
-
-    res.json({
-      consentId: updated.updatedConsent.id,
-      status: updated.updatedConsent.status,
-      fiId: updated.updatedConsent.fiId,
-      tokenId: updated.updatedConsent.tokenId,
-      expiresAt: updated.updatedConsent.expiresAt.toISOString(),
-      alreadyRevoked: false,
+    return res.json({
+      consentId: revokedConsent.consentId ?? req.body.consentId,
+      status: String(revokedConsent.status ?? 'REVOKED').toUpperCase(),
+      tokenId: revokedConsent.tokenId ?? fiRequest.tokenId,
+      fiId: revokedConsent.fiId ?? fiRequest.fiId,
     });
   })
 );
-
 
 app.post(
   '/v1/fi/verify-assertion',

@@ -93,7 +93,7 @@ function ConsoleAliasRedirect() {
   } else if (firstSegment === 'command') {
     const remaining = remainingSegments.join('/');
     target = remaining ? `/command/${remaining}` : '/command';
-  } else if (firstSegment === 'scenario' || firstSegment === 'integrations' || firstSegment === 'audit') {
+  } else if (firstSegment === 'scenario' || firstSegment === 'verifier' || firstSegment === 'integrations' || firstSegment === 'audit') {
     target = `/command/${legacyPath}`;
   }
 

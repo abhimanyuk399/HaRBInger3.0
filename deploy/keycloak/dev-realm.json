@@ -253,16 +253,16 @@
       "requiredActions": []
     },
     {
-      "username": "wallet-nominee-1",
+      "username": "wallet-nominee",
       "enabled": true,
       "emailVerified": true,
       "firstName": "Wallet",
       "lastName": "Nominee",
-      "email": "wallet-nominee-1@example.local",
+      "email": "wallet-nominee@example.local",
       "credentials": [
         {
           "type": "password",
-          "value": "wallet-nominee-1-pass",
+          "value": "wallet-nominee-pass",
           "temporary": false
         }
       ],

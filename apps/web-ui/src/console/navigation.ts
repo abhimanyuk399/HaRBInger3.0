@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Activity, ArrowLeftRight, BriefcaseBusiness, Building2, Gauge, Handshake, ShieldCheck } from 'lucide-react';
+import { Activity, ArrowLeftRight, BriefcaseBusiness, Building2, Gauge, Handshake } from 'lucide-react';
 
 export interface ConsoleNavItem {
   label: string;
@@ -35,12 +35,6 @@ export const consoleNavItems: ConsoleNavItem[] = [
     description: 'FI requests, FI2 reuse, verification triggers',
   },
   {
-    label: 'Verifier',
-    path: '/console/verifier',
-    icon: ShieldCheck,
-    description: 'Verification outcomes and shared payload view',
-  },
-  {
     label: 'Integrations',
     path: '/console/integrations',
     icon: Handshake,
@@ -59,7 +53,6 @@ export const consolePageTitles: Record<string, string> = {
   '/console/scenario': 'Scenario Orchestration',
   '/console/wallet': 'Wallet Ops',
   '/console/fi': 'FI Console',
-  '/console/verifier': 'Verifier',
   '/console/integrations': 'Integrations',
   '/console/audit': 'Audit',
 };

@@ -72,7 +72,7 @@ function Get-ClientAccessToken([string]$realm,[string]$clientId,[string]$secret)
 
 $envMap=Load-EnvMap
 $realm='bharat-kyc-dev'
-$uid='wallet-owner-1'
+$uid='KYC-1234'
 $walletUser=$envMap['KEYCLOAK_WALLET_OWNER_USER']
 $walletPass=$envMap['KEYCLOAK_WALLET_OWNER_PASSWORD']
 

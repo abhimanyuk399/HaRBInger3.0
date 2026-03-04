@@ -13,6 +13,7 @@ export default function FiHomePage() {
     walletConsents,
     verificationResults,
     failures,
+    activities,
     refreshWalletConsents,
     fiTokenCoverage,
     refreshFiTokenCoverage,
@@ -24,6 +25,8 @@ export default function FiHomePage() {
     // Refresh key dashboard data without requiring manual reload and when FI identity changes.
     void Promise.allSettled([refreshWalletConsents(), refreshFiTokenCoverage()]);
   }, [activeFiUsername, fiAuthenticated, refreshFiTokenCoverage, refreshWalletConsents]);
+
+  const fiFailures = useMemo(() => failures.filter((failure) => failure.service === 'fi' || failure.service === 'consent'), [failures]);
 
   const { pending, approved, rejected, verifySuccess, verifyFail } = useMemo(() => {
     let pendingCount = 0;
@@ -37,13 +40,19 @@ export default function FiHomePage() {
       else if (status === 'REJECTED' || status === 'REVOKED' || status === 'EXPIRED') rejectedCount += 1;
     });
 
-    const successCount = verificationResults.filter((item) => item.mode === 'success').length;
-    const failCount = verificationResults.filter((item) => item.mode !== 'success').length;
+    let successCount = verificationResults.filter((item) => item.mode === 'success').length;
+    let failCount = verificationResults.filter((item) => item.mode !== 'success').length;
+
+    if (successCount === 0 && failCount === 0) {
+      // Fallback to activity stream so FI Home reflects auto-verification outcomes in current session too.
+      successCount = activities.filter((event) => event.service === 'fi' && event.label === 'ASSERTION_VERIFIED_SUCCESS').length;
+      failCount = activities.filter((event) => event.service === 'fi' && event.label === 'ASSERTION_VERIFIED_EXPECTED_FAIL').length;
+    }
 
     return { pending: pendingCount, approved: approvedCount, rejected: rejectedCount, verifySuccess: successCount, verifyFail: failCount };
-  }, [walletConsents, verificationResults]);
+  }, [activities, walletConsents, verificationResults]);
 
-  const latestFailure = failures[0];
+  const latestFailure = fiFailures[0] ?? null;
   const [fiOnboardingUserId, setFiOnboardingUserId] = useState<string | null>(null);
   const [fiOnboardingError, setFiOnboardingError] = useState<string | null>(null);
 
@@ -199,29 +208,6 @@ export default function FiHomePage() {
         </div>
       </section>
 
-
-      <section className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Capability access (FI actions)</p>
-          <h3 className="mt-2 text-lg font-semibold text-slate-900">Lifecycle, consent and audit from FI portal</h3>
-          <p className="mt-2 text-sm text-slate-600">Use FI Portal for consent creation, FI-side consent revocation, verification, and audit timelines. Command Centre is intended for bird’s-eye monitoring.</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link to="/fi/queue" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Consent queue <ArrowRight className="h-3.5 w-3.5" /></Link>
-            <Link to="/fi/timeline" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Audit timeline <ArrowRight className="h-3.5 w-3.5" /></Link>
-            <Link to="/fi/create" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Create consent <ArrowRight className="h-3.5 w-3.5" /></Link>
-          </div>
-        </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Interop & sector reuse</p>
-          <h3 className="mt-2 text-lg font-semibold text-slate-900">CKYCR / Aadhaar / DigiLocker and periodic KYC</h3>
-          <ul className="mt-2 space-y-1.5 text-sm text-slate-600">
-            <li>• FI flows use token verification and consent APIs backed by common service adapters.</li>
-            <li>• CKYCR / Aadhaar / DigiLocker integration readiness remains visible in Command Centre (bird’s-eye view).</li>
-            <li>• Periodic KYC, address update, and renewal auditability are retained in lifecycle workflows.</li>
-          </ul>
-        </div>
-      </section>
-
       <section className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
         <div className="space-y-5">
           <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#0b122b)] p-5 text-slate-100">
@@ -369,6 +355,7 @@ export default function FiHomePage() {
 
         <div className="space-y-5">
           <NotificationList title="Notifications" items={notifications} />
+
 
         </div>
       </section>

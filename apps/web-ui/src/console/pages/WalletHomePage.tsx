@@ -1,4 +1,4 @@
-import { ArrowRight, BadgeCheck, Clock, RefreshCcw } from 'lucide-react';
+import { ArrowRight, BadgeCheck, CheckCircle2, Clock, RefreshCcw, ShieldCheck, Users2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useMemo } from 'react';
 import { useConsole } from '../ConsoleContext';
@@ -61,18 +61,23 @@ export default function WalletHomePage() {
 
   const lastEvent = activities[0];
 
-  const activeWalletTokenRecord = walletTokens.find((token) => String(token.status ?? '').toUpperCase() === 'ACTIVE') ?? null;
-  const latestWalletTokenRecord = walletTokens[0] ?? null;
-  const currentTokenStatus = activeWalletTokenRecord
-    ? String(activeWalletTokenRecord.status ?? 'ACTIVE').toUpperCase()
-    : walletTokens.length > 0
-      ? 'NO ACTIVE TOKEN'
-      : (registrySnapshot?.status ? String(registrySnapshot.status).toUpperCase() : 'NO ACTIVE TOKEN');
+  const activeWalletToken = useMemo(() => {
+    const active = walletTokens.find((token) => String(token.status ?? '').toUpperCase() === 'ACTIVE');
+    return active ?? walletTokens[0] ?? null;
+  }, [walletTokens]);
 
-  const tokenExpirySource = activeWalletTokenRecord ?? latestWalletTokenRecord ?? registrySnapshot ?? null;
-  const tokenExpiresAt = tokenExpirySource?.expiresAt ? new Date(String(tokenExpirySource.expiresAt)) : null;
+  const currentTokenStatus = activeWalletToken
+    ? String(activeWalletToken.status ?? '').toUpperCase()
+    : registrySnapshot?.status
+      ? String(registrySnapshot.status).toUpperCase()
+      : 'NO ACTIVE TOKEN';
+
+  const tokenExpiryIso =
+    (activeWalletToken as unknown as Record<string, unknown> | null)?.expiresAt as string | undefined ??
+    (registrySnapshot?.expiresAt ? String(registrySnapshot.expiresAt) : undefined);
+  const tokenExpiresAt = tokenExpiryIso ? new Date(tokenExpiryIso) : null;
   const tokenExpiryDays = tokenExpiresAt ? Math.ceil((tokenExpiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
-  const tokenExpiryLabel = tokenExpiryDays === null ? 'Unknown' : tokenExpiryDays < 0 ? 'Expired' : `${tokenExpiryDays}d`;
+  const tokenExpiryLabel = tokenExpiryDays === null ? 'No active token' : tokenExpiryDays < 0 ? 'Expired' : `${tokenExpiryDays}d`;
 
   const pendingInbox = walletConsents
     .filter((c) => String((c as Record<string, unknown>).lifecycleStatus ?? (c as Record<string, unknown>).status ?? '').toUpperCase() === 'PENDING')
@@ -172,31 +177,49 @@ export default function WalletHomePage() {
         </div>
       </section>
 
-
-      <section className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Capability access (Wallet actions)</p>
-          <h3 className="mt-2 text-lg font-semibold text-slate-900">User-controlled consent, token and delegation</h3>
-          <p className="mt-2 text-sm text-slate-600">Use Wallet Portal for user-side consent approval/revocation, nominee/guardian delegation, and wallet activity audit. Command Centre should remain bird’s-eye visibility.</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link to="/wallet/inbox" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Consent inbox <ArrowRight className="h-3.5 w-3.5" /></Link>
-            <Link to="/wallet/delegations" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Delegations <ArrowRight className="h-3.5 w-3.5" /></Link>
-            <Link to="/wallet/timeline" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Audit timeline <ArrowRight className="h-3.5 w-3.5" /></Link>
-          </div>
-        </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Lifecycle & periodic KYC</p>
-          <h3 className="mt-2 text-lg font-semibold text-slate-900">Revocation, renewal, periodic updation, address reuse</h3>
-          <ul className="mt-2 space-y-1.5 text-sm text-slate-600">
-            <li>• Real-time token/consent lifecycle events are tracked in wallet + FI audit timelines.</li>
-            <li>• Nominee / legal-heir delegation controls are available in Wallet portal.</li>
-            <li>• Periodic KYC and address-update scenarios remain supported through lifecycle + integration workflows.</li>
-          </ul>
-        </div>
-      </section>
-
       <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
         <div className="space-y-4">
+          <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#0b122b)] p-4 text-slate-100">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Token history (all)</p>
+                <p className="mt-1 text-sm text-slate-300">Current status of all issued tokens for this wallet user.</p>
+              </div>
+              <button type="button" onClick={() => void refreshWalletTokens(activeWalletUsername ?? undefined)} className="text-xs font-semibold text-slate-200 hover:text-white hover:underline">Refresh</button>
+            </div>
+            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-white/[0.04] text-xs uppercase tracking-wider text-slate-300">
+                  <tr>
+                    <th className="px-3 py-2.5">Token ID</th>
+                    <th className="px-3 py-2.5">Status</th>
+                    <th className="px-3 py-2.5">Version</th>
+                    <th className="px-3 py-2.5">Expiry</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {walletTokens.length === 0 ? (
+                    <tr><td colSpan={4} className="px-3 py-3 text-sm text-slate-300">No token history found for this user.</td></tr>
+                  ) : (
+                    walletTokens.map((token) => {
+                      const status = String(token.status ?? '').toUpperCase() || 'UNKNOWN';
+                      const version = String((token as unknown as Record<string, unknown>).version ?? '—');
+                      const expiresAt = (token as unknown as Record<string, unknown>).expiresAt as string | undefined;
+                      return (
+                        <tr key={String(token.tokenId)} className="bg-white/[0.02] hover:bg-white/[0.05]">
+                          <td className="px-3 py-2.5 text-slate-100 font-mono">{String(token.tokenId).slice(0, 16)}…</td>
+                          <td className="px-3 py-2.5 text-slate-200">{status}</td>
+                          <td className="px-3 py-2.5 text-slate-300">{version}</td>
+                          <td className="px-3 py-2.5 text-slate-300">{expiresAt ? new Date(expiresAt).toLocaleDateString() : '—'}</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#0b122b)] p-4 text-slate-100">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -257,51 +280,11 @@ export default function WalletHomePage() {
               </table>
             </div>
           </div>
-
-          <div className="rounded-3xl border border-slate-700/70 bg-[linear-gradient(145deg,#0f172a,#0b122b)] p-4 text-slate-100">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Token history (all)</p>
-                <p className="mt-1 text-sm text-slate-300">All wallet tokens with current status.</p>
-              </div>
-              <button className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-white/[0.08]" onClick={() => void refreshWalletTokens(activeWalletUsername ?? undefined)} type="button">
-                <RefreshCcw className="h-4 w-4" />
-                Refresh
-              </button>
-            </div>
-            <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-white/[0.04] text-xs uppercase tracking-wider text-slate-300">
-                  <tr>
-                    <th className="px-3 py-2.5">Token ID</th>
-                    <th className="px-3 py-2.5">Status</th>
-                    <th className="px-3 py-2.5">Version</th>
-                    <th className="px-3 py-2.5">Expires</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/10">
-                  {walletTokens.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-3 py-3 text-sm text-slate-300">No token history found.</td>
-                    </tr>
-                  ) : (
-                    walletTokens.map((token, idx) => (
-                      <tr key={String(token.tokenId ?? idx)} className="bg-white/[0.02] hover:bg-white/[0.05]">
-                        <td className="px-3 py-2.5 text-slate-100">{String(token.tokenId ?? '—')}</td>
-                        <td className="px-3 py-2.5 text-slate-200">{String(token.status ?? 'UNKNOWN').toUpperCase()}</td>
-                        <td className="px-3 py-2.5 text-slate-300">{String(token.version ?? '—')}</td>
-                        <td className="px-3 py-2.5 text-slate-300">{token.expiresAt ? new Date(String(token.expiresAt)).toLocaleString() : '—'}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
 
         <div className="space-y-4">
           <NotificationList title="Notifications" items={notifications} />
+
         </div>
       </section>
     </div>
