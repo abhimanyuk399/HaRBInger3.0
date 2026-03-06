@@ -2034,38 +2034,6 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
     }
   }, [apiCall, consentExpiredObserved, consentId, pushActivity, requireFiToken, setCoverageFlag, verificationResults]);
 
-  const revokeFiConsent = useCallback(async (targetConsentId?: string, reason?: string) => {
-    const consentToRevoke = (targetConsentId ?? consentId ?? '').trim();
-    if (!consentToRevoke) {
-      throw new Error('Select a consent first.');
-    }
-    setRunningAction('fi-revoke-consent');
-    setStatusMessage('Revoking consent from FI...');
-    try {
-      const fiToken = await requireFiToken();
-      const response = await apiCall<{ consentId: string; status: string; tokenId?: string; fiId?: string }>({
-        service: 'fi',
-        title: 'FI Revoke Consent',
-        method: 'POST',
-        path: routeFor(api.fi, '/v1/fi/revoke-consent'),
-        token: fiToken ?? undefined,
-        body: { consentId: consentToRevoke, ...(reason ? { reason } : {}) },
-      });
-
-      setWalletConsents((previous) => previous.map((item) =>
-        item.consentId === consentToRevoke ? normalizeWalletConsentView({ ...item, status: response.status }) : item
-      ));
-      if (consentId === consentToRevoke) {
-        setConsentStatus(response.status);
-      }
-      pushActivity({ service: 'fi', label: 'FI_CONSENT_REVOKED', status: 'success', detail: { consentId: consentToRevoke, reason: reason ?? 'fi_revoked' } });
-      await refreshWalletConsents();
-      setStatusMessage(`Consent revoked from FI: ${consentToRevoke}`);
-    } finally {
-      setRunningAction(null);
-    }
-  }, [api, apiCall, consentId, pushActivity, refreshWalletConsents, requireFiToken]);
-
   const runFi2Reuse = useCallback(async () => {
     if (!tokenId) {
       throw new Error('Issue token first.');
@@ -2219,6 +2187,45 @@ export function ConsoleProvider({ children }: { children: React.ReactNode }) {
       setRunningAction(null);
     }
   }, [fetchWalletConsentsWithToken, requireWalletToken]);
+
+  const revokeFiConsent = useCallback(async (targetConsentId?: string, reason?: string) => {
+    const consentToRevoke = (targetConsentId ?? consentId ?? '').trim();
+    if (!consentToRevoke) {
+      throw new Error('Select a consent first.');
+    }
+    setRunningAction('fi-revoke-consent');
+    setStatusMessage('Revoking consent from FI...');
+    try {
+      const fiToken = await requireFiToken();
+      const response = await apiCall<{ consentId: string; status: string; tokenId?: string; fiId?: string }>({
+        service: 'fi',
+        title: 'FI Revoke Consent',
+        method: 'POST',
+        path: routeFor(api.fi, '/v1/fi/revoke-consent'),
+        token: fiToken ?? undefined,
+        body: { consentId: consentToRevoke, ...(reason ? { reason } : {}) },
+      });
+
+      setWalletConsents((previous) =>
+        previous.map((item) =>
+          item.consentId === consentToRevoke ? normalizeWalletConsentView({ ...item, status: response.status }) : item
+        )
+      );
+      if (consentId === consentToRevoke) {
+        setConsentStatus(response.status);
+      }
+      pushActivity({
+        service: 'fi',
+        label: 'FI_CONSENT_REVOKED',
+        status: 'success',
+        detail: { consentId: consentToRevoke, reason: reason ?? 'fi_revoked' },
+      });
+      await refreshWalletConsents();
+      setStatusMessage(`Consent revoked from FI: ${consentToRevoke}`);
+    } finally {
+      setRunningAction(null);
+    }
+  }, [api, apiCall, consentId, pushActivity, refreshWalletConsents, requireFiToken]);
 
   const refreshWalletReviewStatus = useCallback(async () => {
     const userId = activeWalletUsername?.trim();
